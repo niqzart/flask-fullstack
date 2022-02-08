@@ -18,9 +18,12 @@ from .whoosh import IndexService
 
 
 class Flask(_Flask):
-    def __init__(self, *args, versions, **kwargs):
+    def __init__(self, *args, versions=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.versions = versions
+        if versions is None:
+            self.versions = {}
+        else:
+            self.versions = versions
 
     def secrets_from_env(self, default) -> None:
         for secret_name in ["SECRET_KEY", "SECURITY_PASSWORD_SALT", "JWT_SECRET_KEY", "API_KEY"]:
@@ -38,7 +41,7 @@ class Flask(_Flask):
                 "name": "access_token_cookie"
             }
         } if use_jwt else None
-        api = Api(self, doc="/doc/", version=self.versions["API"], authorizations=authorizations)
+        api = Api(self, doc="/doc/", version=self.versions.get("API", None), authorizations=authorizations)
         api.add_namespace(flask_restx_has_bad_design)  # TODO workaround
         return api
 
