@@ -1,13 +1,16 @@
+from collections.abc import Callable
 from datetime import timedelta, datetime, timezone
 from logging.config import dictConfig
 from os import getenv
+from traceback import format_tb
 
-from flask import Flask as _Flask, Response
+from flask import Flask as _Flask, Response, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, get_jwt, set_access_cookies, create_access_token, get_jwt_identity
 from flask_restx import Api
 from sqlalchemy import create_engine, MetaData
 from sqlalchemy.orm import DeclarativeMeta, declarative_base
+from werkzeug.exceptions import NotFound
 
 from .marshals import flask_restx_has_bad_design
 from .sqlalchemy import Sessionmaker
@@ -39,8 +42,22 @@ class Flask(_Flask):
         api.add_namespace(flask_restx_has_bad_design)  # TODO workaround
         return api
 
-    def configure_jwt_manager(self, sessionmaker: Sessionmaker, location: list[str],
-                              access_expires: timedelta) -> JWTManager:
+    def return_error(self, code: int, message: str):
+        return message, code
+
+    def configure_error_handlers(self, log_stuff: Callable[[str, str], None]):  # TODO redo with `logging`
+        @self.errorhandler(NotFound)
+        def on_not_found(_):
+            return self.return_error(404, "Not Found")
+
+        @self.errorhandler(Exception)
+        def on_any_exception(error: Exception):
+            error_text: str = f"Requested URL: {request.path}\nError: {repr(error)}\n" + \
+                              "".join(format_tb(error.__traceback__))
+            log_stuff("error", error_text)
+            return self.return_error(500, error_text)
+
+    def configure_jwt_manager(self, location: list[str], access_expires: timedelta) -> JWTManager:
         self.config["JWT_TOKEN_LOCATION"] = location
         self.config["JWT_COOKIE_CSRF_PROTECT"] = False
         self.config["JWT_COOKIE_SAMESITE"] = "None"
