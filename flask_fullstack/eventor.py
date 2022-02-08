@@ -26,7 +26,7 @@ class EventGroup(BaseEventGroup, metaclass=ABCMeta):
         self.sessionmaker = sessionmaker
 
     def with_begin(self, function):
-        return self.sessionmaker.with_begin
+        return self.sessionmaker.with_begin(function)
 
     def abort(self, error_code: Union[int, str], description: str, *, critical: bool = False, **kwargs):
         raise EventException(error_code, description, critical)

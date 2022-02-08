@@ -27,7 +27,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
         self.sessionmaker = sessionmaker
 
     def with_begin(self, function):
-        return self.sessionmaker.with_begin
+        return self.sessionmaker.with_begin(function)
 
     def abort(self, code: int, message: str = None, **kwargs):
         default_abort(code, message, **kwargs)
