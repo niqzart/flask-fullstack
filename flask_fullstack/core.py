@@ -87,7 +87,7 @@ class Flask(_Flask):
         return jwt
 
     def configure_jwt_with_loaders(self, location: list[str], access_expires: timedelta,
-                                   log_stuff: Callable[[str, str], None]) -> None:
+                                   log_stuff: Callable[[str, str], None]) -> JWTManager:
         jwt = self.configure_jwt_manager(location, access_expires)
 
         @jwt.expired_token_loader
@@ -109,6 +109,8 @@ class Flask(_Flask):
             if callback.startswith("Missing cookie"):
                 log_stuff("error", f"Unauthorized: {callback}\n[`{datetime.utcnow()}`]")
             return self.return_error(401, f"unauthorized: {callback}")
+
+        return jwt
 
 
 def configure_logging(config: dict):
