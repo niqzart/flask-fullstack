@@ -80,6 +80,30 @@ class Flask(_Flask):
 
         return jwt
 
+    def configure_jwt_with_loaders(self, location: list[str], access_expires: timedelta,
+                                   log_stuff: Callable[[str, str], None]) -> None:
+        jwt = self.configure_jwt_manager(location, access_expires)
+
+        @jwt.expired_token_loader
+        def expired_token_callback(*_):
+            return self.return_error(401, "expired token")
+
+        @jwt.token_verification_failed_loader
+        def verification_failed_callback(*_):
+            log_stuff("error", f"Token verification somehow failed\n[`{datetime.utcnow()}`]")
+            return self.return_error(401, "token verification failed")
+
+        @jwt.invalid_token_loader
+        def invalid_token_callback(callback):
+            log_stuff("error", f"Invalid token: {callback}\n[`{datetime.utcnow()}`]")
+            return self.return_error(422, f"invalid token: {callback}")
+
+        @jwt.unauthorized_loader
+        def unauthorized_callback(callback: str):
+            if callback.startswith("Missing cookie"):
+                log_stuff("error", f"Unauthorized: {callback}\n[`{datetime.utcnow()}`]")
+            return self.return_error(401, f"unauthorized: {callback}")
+
 
 def configure_logging(config: dict):
     dictConfig(config)
