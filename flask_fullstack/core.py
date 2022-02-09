@@ -26,7 +26,7 @@ class Flask(_Flask):
             self.versions = versions
 
     def debug_from_env(self, default=True) -> None:
-        self.debug = default != getenv("DEBUG", None) is not None
+        self.debug = default != (getenv("DEBUG", None) is not None)
 
     def secrets_from_env(self, default) -> None:
         for secret_name in ["SECRET_KEY", "SECURITY_PASSWORD_SALT", "JWT_SECRET_KEY", "API_KEY"]:
