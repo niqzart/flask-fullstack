@@ -13,6 +13,9 @@ from .mixins import DatabaseSearcherMixin, JWTAuthorizerMixin
 from .sqlalchemy import Sessionmaker
 
 
+Undefined = object()
+
+
 class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
     """
     Expansion of :class:`RestXNamespace`, which adds decorators for methods of :class:`Resource`.
@@ -35,7 +38,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
     def doc_abort(self, error_code: Union[int, str], description: str, *, critical: bool = False):
         return self.response(*ResponseDoc.error_response("404 ", description).get_args())
 
-    def argument_parser(self, parser: RequestParser):
+    def argument_parser(self, parser: RequestParser, use_undefined: bool = False):
         """
         - Parses request parameters and adds them to kwargs used to call the decorated function.
         - Automatically updates endpoint's parameters with arguments from the parser.
@@ -46,6 +49,8 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
             @wraps(function)
             def argument_inner(*args, **kwargs):
                 kwargs.update(parser.parse_args())
+                if use_undefined:
+                    kwargs.update({args.name: Undefined for args in parser.args if args.name not in kwargs.keys()})
                 return function(*args, **kwargs)
 
             return argument_inner
