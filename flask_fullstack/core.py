@@ -3,17 +3,17 @@ from datetime import timedelta, datetime, timezone
 from logging.config import dictConfig
 from os import getenv
 from traceback import format_tb
+from typing import Type
 
 from flask import Flask as _Flask, Response, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, get_jwt, set_access_cookies, create_access_token, get_jwt_identity
 from flask_restx import Api
 from sqlalchemy import create_engine, MetaData
-from sqlalchemy.orm import DeclarativeMeta, declarative_base
 from werkzeug.exceptions import NotFound
 
 from .marshals import flask_restx_has_bad_design
-from .sqlalchemy import Sessionmaker
+from .sqlalchemy import Sessionmaker, create_base
 from .whoosh import IndexService
 
 
@@ -117,9 +117,9 @@ def configure_logging(config: dict):
     dictConfig(config)
 
 
-def configure_sqlalchemy(db_url: str) -> tuple[MetaData, DeclarativeMeta, Sessionmaker]:
-    engine = create_engine(db_url, pool_recycle=280)  # , echo=True)
-    return (db_meta := MetaData(bind=engine)), declarative_base(metadata=db_meta), Sessionmaker(bind=engine)
+def configure_sqlalchemy(db_url: str, **engine_kwargs) -> tuple[MetaData, Type, Sessionmaker]:
+    engine = create_engine(db_url, pool_recycle=280, **engine_kwargs)
+    return (db_meta := MetaData(bind=engine)), create_base(db_meta), Sessionmaker(bind=engine)
 
 
 def configure_whooshee(sessionmaker: Sessionmaker, whoosh_base: str):
