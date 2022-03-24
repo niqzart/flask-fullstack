@@ -4,7 +4,29 @@ from functools import wraps
 from typing import TypeVar, Type
 
 from sqlalchemy import JSON, MetaData
-from sqlalchemy.orm import sessionmaker, declarative_base, Session
+from sqlalchemy.engine import Row
+from sqlalchemy.orm import sessionmaker, declarative_base, Session as _Session
+from sqlalchemy.sql import Select
+
+
+class Session(_Session):
+    def get_first(self, stmt: Select) -> object:
+        return self.execute(stmt).scalars().first()
+
+    def get_first_row(self, stmt: Select) -> Row:
+        return self.execute(stmt).first()
+
+    def get_all(self, stmt: Select) -> list[object]:
+        return self.execute(stmt).scalars().all()
+
+    def get_all_rows(self, stmt: Select) -> list[Row]:
+        return self.execute(stmt).all()
+
+    def get_paginated(self, stmt: Select, offset: int, limit: int) -> list[object]:
+        return self.get_all(stmt.offset(offset).limit(limit))
+
+    def get_paginated_rows(self, stmt: Select, offset: int, limit: int) -> list[Row]:
+        return self.get_all_rows(stmt.offset(offset).limit(limit))
 
 
 class Sessionmaker(sessionmaker):
