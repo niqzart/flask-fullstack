@@ -13,7 +13,7 @@ from sqlalchemy import create_engine, MetaData
 from werkzeug.exceptions import NotFound
 
 from .marshals import flask_restx_has_bad_design
-from .sqlalchemy import Sessionmaker, create_base, ModBase
+from .sqlalchemy import Sessionmaker, create_base, ModBase, Session
 from .whoosh import IndexService
 
 
@@ -119,7 +119,7 @@ def configure_logging(config: dict):
 
 def configure_sqlalchemy(db_url: str, **engine_kwargs) -> tuple[MetaData, Type[ModBase], Sessionmaker]:
     engine = create_engine(db_url, pool_recycle=280, **engine_kwargs)
-    return (db_meta := MetaData(bind=engine)), create_base(db_meta), Sessionmaker(bind=engine)
+    return (db_meta := MetaData(bind=engine)), create_base(db_meta), Sessionmaker(bind=engine, class_=Session)
 
 
 def configure_whooshee(sessionmaker: Sessionmaker, whoosh_base: str):
