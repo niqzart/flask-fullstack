@@ -117,7 +117,7 @@ def configure_logging(config: dict):
     dictConfig(config)
 
 
-def configure_sqlalchemy(db_url: str, **engine_kwargs) -> tuple[MetaData, Type[Base], Sessionmaker]:
+def configure_sqlalchemy(db_url: str, **engine_kwargs) -> tuple[MetaData, Type[ModBase], Sessionmaker]:
     engine = create_engine(db_url, pool_recycle=280, **engine_kwargs)
     return (db_meta := MetaData(bind=engine)), create_base(db_meta), Sessionmaker(bind=engine)
 

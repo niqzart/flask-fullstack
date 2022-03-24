@@ -6,7 +6,7 @@ from typing import TypeVar, Type
 
 from sqlalchemy import JSON, MetaData
 from sqlalchemy.engine import Result, ScalarResult
-from sqlalchemy.orm import sessionmaker, declarative_base, Session, DeclarativeMeta
+from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from sqlalchemy.sql import Select
 
 
@@ -124,7 +124,7 @@ class JSONWithSchema(JSON):
 t = TypeVar("t", bound="ModBase")
 
 
-class Base:
+class ModBase:
     @classmethod
     def create(cls: Type[t], session: Session, **kwargs) -> t:
         entry = cls(**kwargs)
@@ -139,5 +139,5 @@ class Base:
         session.flush()
 
 
-def create_base(meta: MetaData) -> Type[Base]:
-    return declarative_base(metadata=meta, cls=Base)
+def create_base(meta: MetaData) -> Type[ModBase]:
+    return declarative_base(metadata=meta, cls=ModBase)
