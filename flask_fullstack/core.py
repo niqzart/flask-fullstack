@@ -13,7 +13,7 @@ from sqlalchemy import create_engine, MetaData
 from werkzeug.exceptions import NotFound
 
 from .marshals import flask_restx_has_bad_design
-from .sqlalchemy import Sessionmaker, create_base, Base
+from .sqlalchemy import Sessionmaker, create_base, ModBase
 from .whoosh import IndexService
 
 
