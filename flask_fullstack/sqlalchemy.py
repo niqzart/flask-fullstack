@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from functools import wraps
 from typing import TypeVar, Type
 
 from sqlalchemy import JSON, MetaData
-from sqlalchemy.engine import Result, ScalarResult
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
-from sqlalchemy.sql import Select
 
 
 class Sessionmaker(sessionmaker):
@@ -33,76 +30,6 @@ class Sessionmaker(sessionmaker):
                 return function(*args, **kwargs)
 
         return with_autocommit_inner
-
-    def execute(self, function: Callable[..., Select]) -> Callable[..., Result]:
-        """ """
-
-        @wraps(function)
-        @self.with_begin
-        def execute_inner(*args, **kwargs):
-            session = kwargs.pop("session")
-            return session.execute(function(*args, **kwargs))
-
-        return execute_inner
-
-    def extract_scalars(self, function: Callable[..., Result]) -> Callable[..., ScalarResult]:
-        @wraps(function)
-        def extract_scalars(*args, **kwargs):
-            return function(*args, **kwargs).scalars()
-
-        return extract_scalars
-
-    def extract_first(self, function: Callable[..., Result]) -> Callable[..., ...]:
-        @wraps(function)
-        def extract_first_inner(*args, **kwargs):
-            return function(*args, **kwargs).first()
-
-        return extract_first_inner
-
-    def extract_all(self, function: Callable[..., Result]) -> Callable[..., ...]:
-        @wraps(function)
-        def extract_all_inner(*args, **kwargs):
-            return function(*args, **kwargs).all()
-
-        return extract_all_inner
-
-    def select_paginated(self, function: Callable[..., Select]) -> Callable[..., list[...]]:
-        @wraps(function)
-        def select_paginated_inner(*args, **kwargs):
-            return function(*args, **kwargs).offset(kwargs.pop("offset")).limit(kwargs.pop("limit"))
-
-        return select_paginated_inner
-
-    def select_first(self, function: Callable[..., Select]) -> Callable[..., ...]:
-        @wraps(function)
-        @self.extract_first
-        @self.extract_scalars
-        @self.execute
-        def select_first_inner(*args, **kwargs):
-            return function(*args, **kwargs)
-
-        return select_first_inner
-
-    def get_all(self, function: Callable[..., Select]) -> Callable[..., list[...]]:
-        @wraps(function)
-        @self.extract_all
-        @self.extract_scalars
-        @self.execute
-        def get_all_inner(*args, **kwargs):
-            return function(*args, **kwargs)
-
-        return get_all_inner
-
-    def get_paginated(self, function: Callable[..., Select]) -> Callable[..., list[...]]:
-        @wraps(function)
-        @self.extract_all
-        @self.extract_scalars
-        @self.execute
-        @self.select_paginated
-        def get_paginated_inner(*args, **kwargs):
-            return function(*args, **kwargs)
-
-        return get_paginated_inner
 
 
 class JSONWithModel(JSON):
