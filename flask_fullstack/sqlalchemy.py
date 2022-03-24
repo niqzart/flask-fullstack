@@ -10,7 +10,7 @@ from sqlalchemy.sql import Select
 
 
 class Session(_Session):
-    def get_first(self, stmt: Select) -> object:
+    def get_first(self, stmt: Select) -> object | None:
         return self.execute(stmt).scalars().first()
 
     def get_first_row(self, stmt: Select) -> Row:
@@ -84,7 +84,7 @@ class ModBase:
     # TODO find_by_... with reflection
 
     def delete(self, session: Session) -> None:
-        session.delete(session)
+        session.delete(self)
         session.flush()
 
 
