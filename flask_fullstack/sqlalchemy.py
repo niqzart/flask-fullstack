@@ -40,7 +40,7 @@ class Sessionmaker(sessionmaker):
         @wraps(function)
         @self.with_begin
         def execute_inner(*args, **kwargs):
-            session = kwargs["session"]
+            session = kwargs.pop("session")
             return session.execute(function(*args, **kwargs))
 
         return execute_inner
@@ -66,10 +66,10 @@ class Sessionmaker(sessionmaker):
 
         return extract_all_inner
 
-    def select_paginated(self, function: Callable[..., Select]) -> Callable[..., ...]:
+    def select_paginated(self, function: Callable[..., Select]) -> Callable[..., list[...]]:
         @wraps(function)
         def select_paginated_inner(*args, **kwargs):
-            return function(*args, **kwargs).offset(kwargs["offset"]).limit(kwargs["limit"])
+            return function(*args, **kwargs).offset(kwargs.pop("offset")).limit(kwargs.pop("limit"))
 
         return select_paginated_inner
 
