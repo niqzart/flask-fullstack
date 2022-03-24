@@ -82,26 +82,34 @@ class ModBase:
         return entry
 
     @classmethod
-    def select_by_kwargs(cls, order_by=None, **kwargs) -> Select:
-        if order_by is None:
+    def select_by_kwargs(cls, *order_by, **kwargs) -> Select:
+        if len(order_by) == 0:
             return select(cls).filter_by(**kwargs)
-        return select(cls).filter_by(**kwargs).order_by(order_by)
+        return select(cls).filter_by(**kwargs).order_by(*order_by)
 
     @classmethod
-    def find_first_by_kwargs(cls: Type[t], session, order_by=None, **kwargs) -> t | None:
+    def find_first_by_kwargs(cls: Type[t], session, *order_by, **kwargs) -> t | None:
         return session.get_first(cls.select_by_kwargs(order_by, **kwargs))
 
     @classmethod
-    def find_first_row_by_kwargs(cls, session, order_by=None, **kwargs) -> Row | None:
+    def find_first_row_by_kwargs(cls, session, *order_by, **kwargs) -> Row | None:
         return session.get_first_row(cls.select_by_kwargs(order_by, **kwargs))
 
     @classmethod
-    def find_all_by_kwargs(cls: Type[t], session, order_by=None, **kwargs) -> list[t]:
+    def find_all_by_kwargs(cls: Type[t], session, *order_by, **kwargs) -> list[t]:
         return session.get_all(cls.select_by_kwargs(order_by, **kwargs))
 
     @classmethod
-    def find_all_rows_by_kwargs(cls, session, order_by=None, **kwargs) -> list[Row]:
+    def find_all_rows_by_kwargs(cls, session, *order_by, **kwargs) -> list[Row]:
         return session.get_all_rows(cls.select_by_kwargs(order_by, **kwargs))
+
+    @classmethod
+    def find_paginated_by_kwargs(cls: Type[t], session, offset: int, limit: int, *order_by, **kwargs) -> list[t]:
+        return session.get_paginated(cls.select_by_kwargs(order_by, **kwargs), offset, limit)
+
+    @classmethod
+    def find_paginated_rows_by_kwargs(cls, session, offset: int, limit: int, *order_by, **kwargs) -> list[Row]:
+        return session.get_paginated_rows(cls.select_by_kwargs(order_by, **kwargs), offset, limit)
 
     # TODO find_by_... with reflection
 
