@@ -13,7 +13,7 @@ from sqlalchemy import create_engine, MetaData
 from werkzeug.exceptions import NotFound
 
 from .marshals import flask_restx_has_bad_design
-from .sqlalchemy import Sessionmaker, create_base
+from .sqlalchemy import Sessionmaker, create_base, Base
 from .whoosh import IndexService
 
 
@@ -117,7 +117,7 @@ def configure_logging(config: dict):
     dictConfig(config)
 
 
-def configure_sqlalchemy(db_url: str, **engine_kwargs) -> tuple[MetaData, Type, Sessionmaker]:
+def configure_sqlalchemy(db_url: str, **engine_kwargs) -> tuple[MetaData, Type[Base], Sessionmaker]:
     engine = create_engine(db_url, pool_recycle=280, **engine_kwargs)
     return (db_meta := MetaData(bind=engine)), create_base(db_meta), Sessionmaker(bind=engine)
 
