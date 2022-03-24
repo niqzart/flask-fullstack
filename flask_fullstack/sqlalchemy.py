@@ -82,20 +82,26 @@ class ModBase:
         return entry
 
     @classmethod
-    def find_first_by_kwargs(cls, session, **kwargs):
-        return session.get_first(select(cls).filter_by(**kwargs))
+    def select_by_kwargs(cls, order_by=None, **kwargs) -> Select:
+        if order_by is None:
+            return select(cls).filter_by(**kwargs)
+        return select(cls).filter_by(**kwargs).order_by(order_by)
 
     @classmethod
-    def find_first_row_by_kwargs(cls, session, **kwargs):
-        return session.get_first_row(select(cls).filter_by(**kwargs))
+    def find_first_by_kwargs(cls: Type[t], session, order_by=None, **kwargs) -> t | None:
+        return session.get_first(cls.select_by_kwargs(order_by, **kwargs))
 
     @classmethod
-    def find_all_by_kwargs(cls, session, **kwargs):
-        return session.get_all(select(cls).filter_by(**kwargs))
+    def find_first_row_by_kwargs(cls, session, order_by=None, **kwargs) -> Row | None:
+        return session.get_first_row(cls.select_by_kwargs(order_by, **kwargs))
 
     @classmethod
-    def find_all_rows_by_kwargs(cls, session, **kwargs):
-        return session.get_all_rows(select(cls).filter_by(**kwargs))
+    def find_all_by_kwargs(cls: Type[t], session, order_by=None, **kwargs) -> list[t]:
+        return session.get_all(cls.select_by_kwargs(order_by, **kwargs))
+
+    @classmethod
+    def find_all_rows_by_kwargs(cls, session, order_by=None, **kwargs) -> list[Row]:
+        return session.get_all_rows(cls.select_by_kwargs(order_by, **kwargs))
 
     # TODO find_by_... with reflection
 
