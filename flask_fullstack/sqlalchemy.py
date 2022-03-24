@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import wraps
 from typing import TypeVar, Type
 
-from sqlalchemy import JSON, MetaData
+from sqlalchemy import JSON, MetaData, select
 from sqlalchemy.engine import Row
 from sqlalchemy.orm import sessionmaker, declarative_base, Session as _Session
 from sqlalchemy.sql import Select
@@ -80,6 +80,22 @@ class ModBase:
         session.add(entry)
         session.flush()
         return entry
+
+    @classmethod
+    def find_first_by_kwargs(cls, session, **kwargs):
+        return session.get_first(select(cls).filter_by(**kwargs))
+
+    @classmethod
+    def find_first_row_by_kwargs(cls, session, **kwargs):
+        return session.get_first_row(select(cls).filter_by(**kwargs))
+
+    @classmethod
+    def find_all_by_kwargs(cls, session, **kwargs):
+        return session.get_all(select(cls).filter_by(**kwargs))
+
+    @classmethod
+    def find_all_rows_by_kwargs(cls, session, **kwargs):
+        return session.get_all_rows(select(cls).filter_by(**kwargs))
 
     # TODO find_by_... with reflection
 
