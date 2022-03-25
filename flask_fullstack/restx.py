@@ -12,16 +12,15 @@ from .marshals import ResponseDoc
 from .mixins import DatabaseSearcherMixin, JWTAuthorizerMixin
 from .sqlalchemy import Sessionmaker
 
-
 Undefined = object()
 
 
 class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
     """
-    Expansion of :class:`RestXNamespace`, which adds decorators for methods of :class:`Resource`.
+    Expansion of :class:`Namespace`, which adds decorators for methods of :class:`Resource`.
 
     Methods of this class (used as decorators) allow parsing request parameters,
-    modifying responses and automatic updating Swagger documentation where possible
+    modifying responses and automatic updates to the Swagger documentation where possible
     """
 
     def __init__(self, name: str, *, sessionmaker: Sessionmaker, description: str = None, path: str = None,
