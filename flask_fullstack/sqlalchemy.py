@@ -8,6 +8,8 @@ from sqlalchemy.engine import Row
 from sqlalchemy.orm import sessionmaker, declarative_base, Session as _Session
 from sqlalchemy.sql import Select
 
+from flask_fullstack import Identifiable
+
 
 class Session(_Session):
     def get_first(self, stmt: Select) -> object | None:
@@ -73,7 +75,7 @@ class JSONWithSchema(JSON):
 t = TypeVar("t", bound="ModBase")
 
 
-class ModBase:
+class ModBase(Identifiable):
     @classmethod
     def create(cls: Type[t], session: Session, **kwargs) -> t:
         entry = cls(**kwargs)
@@ -110,6 +112,18 @@ class ModBase:
     @classmethod
     def find_paginated_rows_by_kwargs(cls, session, offset: int, limit: int, *order_by, **kwargs) -> list[Row]:
         return session.get_paginated_rows(cls.select_by_kwargs(*order_by, **kwargs), offset, limit)
+
+    @classmethod
+    def find_first(cls: Type[t], *order_by, session=None, **kwargs) -> t | None:
+        return cls.find_first_by_kwargs(session, *order_by, **kwargs)
+
+    @classmethod
+    def find_all(cls: Type[t], *order_by, session=None, **kwargs) -> list[t]:
+        return cls.find_all_by_kwargs(session, *order_by, **kwargs)
+
+    @classmethod
+    def find_paginated(cls: Type[t], offset: int, limit: int, *order_by, session=None, **kwargs) -> list[t]:
+        return cls.find_paginated_by_kwargs(session, offset, limit, *order_by, **kwargs)
 
     # TODO find_by_... with reflection
 
