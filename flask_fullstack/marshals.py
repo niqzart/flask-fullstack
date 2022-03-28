@@ -276,6 +276,84 @@ class Model:
     Can be combined with dataclasses, Pydantic or Marshmallow to define fields
     Instances will be passed as data for flask_restx's marshal function
     """
+    @staticmethod
+    def include_columns(*columns: Column, __use_defaults__: bool = False, __flatten_jsons__: bool = False,
+                        **named_columns: Column) -> Callable[[Type[Model]], Type[Model]]:
+        named_columns = {key.replace("_", "-"): value for key, value in named_columns.items()}
+
+        # Maybe allow *columns: Column to do this here:
+        # (doesn't work for models inside DB classes, as Column.name is populated later)
+        # named_columns.update({column.name.replace("_", "-"): column for column in columns})
+
+        def include_columns_inner(cls: Type[Model]) -> Type[Model]:
+            fields = {}
+
+            class ModModel(cls):
+                __columns_converted__ = False
+
+                @classmethod
+                def convert_columns(cls):  # TODO find a better way
+                    if not cls.__columns_converted__:
+                        named_columns.update({column.name.replace("_", "-"): column for column in columns})
+                        for name, column in named_columns.items():
+                            fields.update(create_fields(column, name, __use_defaults__, __flatten_jsons__))
+                        cls.__columns_converted__ = True
+
+                # TODO make model's ORM attributes usable (__init__?) OR use class properties for Columns in a different way
+                @classmethod
+                def convert(cls: Type[t], orm_object, **context) -> t:
+                    cls.convert_columns()
+                    result: cls = super().convert(orm_object, **context)
+                    for column in named_columns.values():
+                        object.__setattr__(result, column.name, getattr(orm_object, column.name))
+                    return result
+
+                @classmethod
+                def model(cls) -> dict[str, RawField]:
+                    cls.convert_columns()
+                    return dict(super().model(), **fields)
+
+                @classmethod
+                def parser(cls, **kwargs) -> RequestParser:
+                    cls.convert_columns()
+                    result: RequestParser = super().parser(**kwargs)
+                    for name, column in named_columns.items():
+                        data: dict[str, ...] | None = sqlalchemy_column_to_kwargs(column)
+                        if data is not None:
+                            result.add_argument(name, dest=column.name, **data, **kwargs)
+                    return result
+
+            return ModModel
+
+        return include_columns_inner
+
+    @staticmethod
+    def include_model(model: Model) -> Callable[[Type[Model]], Type[Model]]:
+        def include_model_inner(cls: Type[Model]) -> Type[Model]:
+            class ModModel(cls, model):
+                pass
+
+            return ModModel
+
+        return include_model_inner
+
+    @staticmethod
+    def include_context(*names, **var_types):  # TODO Maybe redo
+        var_types.update({name: object for name in names})
+
+        def include_context_inner(cls: Type[Model]) -> Type[Model]:
+            class ModModel(cls):
+                @classmethod
+                def convert(cls: Type[t], orm_object, **context) -> t:
+                    assert all((value := context.get(name, None)) is not None
+                               and isinstance(value, var_type)
+                               for name, var_type in var_types.items()), \
+                        "Context was not filled properly"
+                    return super().convert(orm_object, **context)
+
+            return ModModel
+
+        return include_context_inner
 
     @classmethod
     def convert(cls: Type[t], orm_object, **context) -> t:
@@ -320,81 +398,3 @@ class PydanticModel(BaseModel, Model, ABC):
                 raise ValueError("Nested structures are not supported")  # TODO flat-nested fields support
             parser.add_argument(field.alias, dest=name, type=field.type_, **pydantic_field_to_kwargs(field), **kwargs)
         return parser
-
-
-def include_columns(*columns: Column, __use_defaults__: bool = False, __flatten_jsons__: bool = False,
-                    **named_columns: Column) -> Callable[[Type[Model]], Type[Model]]:
-    named_columns = {key.replace("_", "-"): value for key, value in named_columns.items()}
-    # Maybe allow *columns: Column to do this here:
-    # (doesn't work for models inside DB classes, as Column.name is populated later)
-    # named_columns.update({column.name.replace("_", "-"): column for column in columns})
-
-    def include_columns_inner(cls: Type[Model]) -> Type[Model]:
-        fields = {}
-
-        class ModModel(cls):
-            __columns_converted__ = False
-
-            @classmethod
-            def convert_columns(cls):  # TODO find a better way
-                if not cls.__columns_converted__:
-                    named_columns.update({column.name.replace("_", "-"): column for column in columns})
-                    for name, column in named_columns.items():
-                        fields.update(create_fields(column, name, __use_defaults__, __flatten_jsons__))
-                    cls.__columns_converted__ = True
-
-            # TODO make model's ORM attributes usable (__init__?) OR use class properties for Columns in a different way
-            @classmethod
-            def convert(cls: Type[t], orm_object, **context) -> t:
-                cls.convert_columns()
-                result: cls = super().convert(orm_object, **context)
-                for column in named_columns.values():
-                    object.__setattr__(result, column.name, getattr(orm_object, column.name))
-                return result
-
-            @classmethod
-            def model(cls) -> dict[str, RawField]:
-                cls.convert_columns()
-                return dict(super().model(), **fields)
-
-            @classmethod
-            def parser(cls, **kwargs) -> RequestParser:
-                cls.convert_columns()
-                result: RequestParser = super().parser(**kwargs)
-                for name, column in named_columns.items():
-                    data: dict[str, ...] | None = sqlalchemy_column_to_kwargs(column)
-                    if data is not None:
-                        result.add_argument(name, dest=column.name, **data, **kwargs)
-                return result
-
-        return ModModel
-
-    return include_columns_inner
-
-
-def include_model(model: Model) -> Callable[[Type[Model]], Type[Model]]:  # TODO put inside of something
-    def include_model_inner(cls: Type[Model]) -> Type[Model]:
-        class ModModel(cls, model):
-            pass
-
-        return ModModel
-
-    return include_model_inner
-
-
-def include_context(*names, **var_types):  # TODO Maybe redo
-    var_types.update({name: object for name in names})
-
-    def include_context_inner(cls: Type[Model]) -> Type[Model]:
-        class ModModel(cls):
-            @classmethod
-            def convert(cls: Type[t], orm_object, **context) -> t:
-                assert all((value := context.get(name, None)) is not None
-                           and isinstance(value, var_type)
-                           for name, var_type in var_types.items()), \
-                    "Context was not filled properly"
-                return super().convert(orm_object, **context)
-
-        return ModModel
-
-    return include_context_inner
