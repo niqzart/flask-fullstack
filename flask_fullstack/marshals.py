@@ -320,3 +320,40 @@ class PydanticModel(BaseModel, Model, ABC):
                 raise ValueError("Nested structures are not supported")  # TODO flat-nested fields support
             parser.add_argument(field.alias, dest=name, type=field.type_, **pydantic_field_to_kwargs(field), **kwargs)
         return parser
+
+
+def include_columns(*, __use_defaults__: bool = False, __flatten_jsons__: bool = False,
+                    **named_columns: Column) -> Callable[[Type[Model]], Type[Model]]:
+    named_columns = {key.replace("_", "-"): value for key, value in named_columns.items()}
+    # TODO Maybe allow *columns: Column
+
+    def include_columns_inner(cls: Type[Model]) -> Type[Model]:
+        class ModModel(cls):
+            # TODO make model's ORM attributes usable (__init__?) OR use class properties for Columns in a different way
+            @classmethod
+            def convert(cls: Type[t], orm_object) -> t:
+                cls.convert_columns()
+                result: cls = super().convert(orm_object)
+                for column in named_columns.values():
+                    object.__setattr__(result, column.name, getattr(orm_object, column.name))
+                return result
+
+            @classmethod
+            def model(cls) -> dict[str, RawField]:
+                result = super().model()
+                for name, column in named_columns.items():
+                    result.update(create_fields(column, name, __use_defaults__, __flatten_jsons__))
+                return result
+
+            @classmethod
+            def parser(cls, **kwargs) -> RequestParser:
+                result: RequestParser = super().parser(**kwargs)
+                for name, column in named_columns.items():
+                    data: dict[str, ...] | None = sqlalchemy_column_to_kwargs(column)
+                    if data is not None:
+                        result.add_argument(name, dest=column.name, **data, **kwargs)
+                return result
+
+        return ModModel
+
+    return include_columns_inner
