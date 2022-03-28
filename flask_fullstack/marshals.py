@@ -322,13 +322,27 @@ class PydanticModel(BaseModel, Model, ABC):
         return parser
 
 
-def include_columns(*, __use_defaults__: bool = False, __flatten_jsons__: bool = False,
+def include_columns(*columns: Column, __use_defaults__: bool = False, __flatten_jsons__: bool = False,
                     **named_columns: Column) -> Callable[[Type[Model]], Type[Model]]:
     named_columns = {key.replace("_", "-"): value for key, value in named_columns.items()}
-    # TODO Maybe allow *columns: Column
+    # Maybe allow *columns: Column to do this here:
+    # (doesn't work for models inside DB classes, as Column.name is populated later)
+    # named_columns.update({column.name.replace("_", "-"): column for column in columns})
 
     def include_columns_inner(cls: Type[Model]) -> Type[Model]:
+        fields = {}
+
         class ModModel(cls):
+            __columns_converted__ = False
+
+            @classmethod
+            def convert_columns(cls):  # TODO find a better way
+                if not cls.__columns_converted__:
+                    named_columns.update({column.name.replace("_", "-"): column for column in columns})
+                    for name, column in named_columns.items():
+                        fields.update(create_fields(column, name, __use_defaults__, __flatten_jsons__))
+                    cls.__columns_converted__ = True
+
             # TODO make model's ORM attributes usable (__init__?) OR use class properties for Columns in a different way
             @classmethod
             def convert(cls: Type[t], orm_object) -> t:
@@ -340,13 +354,12 @@ def include_columns(*, __use_defaults__: bool = False, __flatten_jsons__: bool =
 
             @classmethod
             def model(cls) -> dict[str, RawField]:
-                result = super().model()
-                for name, column in named_columns.items():
-                    result.update(create_fields(column, name, __use_defaults__, __flatten_jsons__))
-                return result
+                cls.convert_columns()
+                return dict(super().model(), **fields)
 
             @classmethod
             def parser(cls, **kwargs) -> RequestParser:
+                cls.convert_columns()
                 result: RequestParser = super().parser(**kwargs)
                 for name, column in named_columns.items():
                     data: dict[str, ...] | None = sqlalchemy_column_to_kwargs(column)
