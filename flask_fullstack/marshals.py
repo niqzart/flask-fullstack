@@ -290,3 +290,33 @@ class Model:
         raise NotImplementedError()
 
     # TODO reverse of convert for parsing (see argument parser as well)
+
+
+class PydanticModel(BaseModel, Model, ABC):
+    @staticmethod
+    def pydantic_to_restx_field(field: ModelField) -> RawField:
+        if issubclass(field.type_, Model):
+            result = NestedField(flask_restx_has_bad_design.model(field.type_.model()))
+        else:
+            result = type_to_field[field.type_](**pydantic_field_to_kwargs(field))
+
+        if field.type_ is not field.outer_type_:
+            result = ListField(result)
+        result.attribute = field.name
+        return result
+
+    @classmethod
+    def model(cls) -> dict[str, RawField]:
+        return {field.alias: PydanticModel.pydantic_to_restx_field(field) for name, field in cls.__fields__.items()}
+
+    @classmethod
+    def parser(cls, **kwargs) -> RequestParser:
+        parser: RequestParser = RequestParser()
+        field: ModelField
+        for name, field in cls.__fields__.items():
+            if field.type_ is not field.outer_type_:
+                kwargs["action"] = "append"
+            elif field.is_complex():
+                raise ValueError("Nested structures are not supported")  # TODO flat-nested fields support
+            parser.add_argument(field.alias, dest=name, type=field.type_, **pydantic_field_to_kwargs(field), **kwargs)
+        return parser
