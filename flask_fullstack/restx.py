@@ -96,7 +96,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
         return result
 
-    def lister(self, per_request: int, marshal_model: BaseModel, skip_none: bool = True):
+    def lister(self, per_request: int, marshal_model: BaseModel | Model, skip_none: bool = True):
         """
         - Used for organising pagination.
         - Uses `counter` form incoming arguments for the decorated function and `per_request` argument
@@ -109,8 +109,16 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
         :param skip_none:
         :return:
         """
-        response = ResponseDoc(200, f"Max size of results: {per_request}", BaseModel(f"List" + marshal_model.name, {
-            "results": ListField(Nested(marshal_model), max_items=per_request), "has-next": BoolField}))
+        if isinstance(marshal_model, Model):
+            model = marshal_model.model()
+            name = marshal_model.__name__
+        else:
+            model = marshal_model
+            name = marshal_model.name
+
+        response = {"results": ListField(Nested(model), max_items=per_request), "has-next": BoolField}
+        response = BaseModel(f"List" + name, response)
+        response = ResponseDoc(200, f"Max size of results: {per_request}", response)
 
         def lister_wrapper(function):
             @self.doc_responses(response)
@@ -130,7 +138,9 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
                 if has_next := len(result_list) > per_request:
                     result_list.pop()
 
-                return {"results": marshal(result_list, marshal_model, skip_none=skip_none), "has-next": has_next}
+                if isinstance(marshal_model, Model):
+                    result_list = [marshal_model.convert(result) for result in result_list]
+                return {"results": marshal(result_list, model, skip_none=skip_none), "has-next": has_next}
 
             return lister_inner
 
