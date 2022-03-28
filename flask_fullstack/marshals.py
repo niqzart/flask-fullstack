@@ -357,3 +357,13 @@ def include_columns(*, __use_defaults__: bool = False, __flatten_jsons__: bool =
         return ModModel
 
     return include_columns_inner
+
+
+def include_model(model: Model) -> Callable[[Type[Model]], Type[Model]]:
+    def include_model_inner(cls: Type[Model]) -> Type[Model]:
+        class ModModel(cls, model):
+            pass
+
+        return ModModel
+
+    return include_model_inner
