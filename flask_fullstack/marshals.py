@@ -278,7 +278,7 @@ class Model:
     """
 
     @classmethod
-    def convert(cls: Type[t], orm_object) -> t:
+    def convert(cls: Type[t], orm_object, **context) -> t:
         raise NotImplementedError()
 
     @classmethod
@@ -345,9 +345,9 @@ def include_columns(*columns: Column, __use_defaults__: bool = False, __flatten_
 
             # TODO make model's ORM attributes usable (__init__?) OR use class properties for Columns in a different way
             @classmethod
-            def convert(cls: Type[t], orm_object) -> t:
+            def convert(cls: Type[t], orm_object, **context) -> t:
                 cls.convert_columns()
-                result: cls = super().convert(orm_object)
+                result: cls = super().convert(orm_object, **context)
                 for column in named_columns.values():
                     object.__setattr__(result, column.name, getattr(orm_object, column.name))
                 return result
@@ -372,7 +372,7 @@ def include_columns(*columns: Column, __use_defaults__: bool = False, __flatten_
     return include_columns_inner
 
 
-def include_model(model: Model) -> Callable[[Type[Model]], Type[Model]]:
+def include_model(model: Model) -> Callable[[Type[Model]], Type[Model]]:  # TODO put inside of something
     def include_model_inner(cls: Type[Model]) -> Type[Model]:
         class ModModel(cls, model):
             pass
@@ -380,3 +380,21 @@ def include_model(model: Model) -> Callable[[Type[Model]], Type[Model]]:
         return ModModel
 
     return include_model_inner
+
+
+def include_context(*names, **var_types):  # TODO Maybe redo
+    var_types.update({name: object for name in names})
+
+    def include_context_inner(cls: Type[Model]) -> Type[Model]:
+        class ModModel(cls):
+            @classmethod
+            def convert(cls: Type[t], orm_object, **context) -> t:
+                assert all((value := context.get(name, None)) is not None
+                           and isinstance(value, var_type)
+                           for name, var_type in var_types.items()), \
+                    "Context was not filled properly"
+                return super().convert(orm_object, **context)
+
+        return ModModel
+
+    return include_context_inner
