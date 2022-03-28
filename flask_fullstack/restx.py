@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from functools import wraps
 from typing import Union
 
@@ -79,6 +80,21 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
             return function
 
         return doc_responses_wrapper
+
+    def marshal_with(self, fields: BaseModel | Model, **kwargs):
+        result = super().marshal_with(fields, **kwargs)
+        if isinstance(fields, Model):
+            def marshal_with_wrapper(function: Callable) -> Callable[..., Model]:
+                @wraps(function)
+                @result
+                def marshal_with_inner(*args, **kwargs):
+                    return fields.convert(function(*args, **kwargs), **kwargs)
+
+                return marshal_with_inner
+
+            return marshal_with_wrapper
+
+        return result
 
     def lister(self, per_request: int, marshal_model: BaseModel, skip_none: bool = True):
         """
