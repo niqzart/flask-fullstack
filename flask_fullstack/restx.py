@@ -3,12 +3,12 @@ from __future__ import annotations
 from functools import wraps
 from typing import Union
 
-from flask_restx import Namespace, Model, abort as default_abort
+from flask_restx import Namespace, Model as BaseModel, abort as default_abort
 from flask_restx.fields import List as ListField, Boolean as BoolField, Nested
 from flask_restx.marshalling import marshal
 from flask_restx.reqparse import RequestParser
 
-from .marshals import ResponseDoc
+from .marshals import ResponseDoc, Model
 from .mixins import DatabaseSearcherMixin, JWTAuthorizerMixin
 from .sqlalchemy import Sessionmaker
 
@@ -80,7 +80,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
         return doc_responses_wrapper
 
-    def lister(self, per_request: int, marshal_model: Model, skip_none: bool = True):
+    def lister(self, per_request: int, marshal_model: BaseModel, skip_none: bool = True):
         """
         - Used for organising pagination.
         - Uses `counter` form incoming arguments for the decorated function and `per_request` argument
@@ -93,7 +93,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
         :param skip_none:
         :return:
         """
-        response = ResponseDoc(200, f"Max size of results: {per_request}", Model(f"List" + marshal_model.name, {
+        response = ResponseDoc(200, f"Max size of results: {per_request}", BaseModel(f"List" + marshal_model.name, {
             "results": ListField(Nested(marshal_model), max_items=per_request), "has-next": BoolField}))
 
         def lister_wrapper(function):
@@ -119,3 +119,8 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
             return lister_inner
 
         return lister_wrapper
+
+    def model(self, name: str = None, model=None, **kwargs):
+        if isinstance(model, Model):
+            return super().model(name or Model.__name__, model.model(), **kwargs)
+        return super().model(name, model, **kwargs)
