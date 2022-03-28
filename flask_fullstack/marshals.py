@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import ABC
 from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime
@@ -9,14 +10,14 @@ from flask_restx import Model as _Model, Namespace
 from flask_restx.fields import (Boolean as BooleanField, Integer as IntegerField, Float as FloatField,
                                 String as StringField, Raw as RawField, Nested as NestedField, List as ListField)
 from flask_restx.reqparse import RequestParser
+from pydantic import BaseModel
+from pydantic.fields import ModelField
 from sqlalchemy import Column, Sequence, Float
 from sqlalchemy.sql.type_api import TypeEngine
 from sqlalchemy.types import Boolean, Integer, String, JSON, DateTime, Enum
 
 from .sqlalchemy import JSONWithModel
 from .utils import TypeEnum
-
-flask_restx_has_bad_design: Namespace = Namespace("this-is-dumb")
 
 
 class EnumField(StringField):
@@ -83,6 +84,70 @@ column_to_field: dict[Type[TypeEngine], Type[RawField]] = {
     String: StringField,
 }
 
+column_to_type: dict[Type[TypeEngine], type] = {
+    DateTime: datetime,
+    Boolean: bool,
+    Integer: int,
+    Float: float,
+    String: str,
+}
+
+
+def pydantic_field_to_kwargs(field: ModelField) -> dict[str, ...]:
+    return {"default": field.default, "required": field.required}
+
+
+def sqlalchemy_column_to_kwargs(column: Column) -> dict[str, ...] | None:
+    result: dict[str, ...] = {"default": column.default, "required": not column.nullable and column.default is None}
+
+    for supported_type, type_ in column_to_field.items():
+        if isinstance(column.type, supported_type):
+            result["type"] = type_
+            return result
+
+    if isinstance(column.type, Enum):
+        result["type"] = str
+        # result["choices"] = column.type  # TODO support for enums with a renewed TypeEnum field
+        return result
+
+
+flask_restx_has_bad_design: Namespace = Namespace("this-is-dumb")  # TODO fix by overriding the .model in Namespace!
+
+
+def move_field_attribute(root_name: str, field_name: str, field_def: Type[RawField] | RawField):
+    attribute_name: str = f"{root_name}.{field_name}"
+    if isinstance(field_def, type):
+        return field_def(attribute=attribute_name)
+    field_def.attribute = attribute_name
+    return field_def
+
+
+def create_fields(column: Column, name: str, use_defaults: bool = False,
+                  flatten_jsons: bool = False) -> dict[str, ...]:
+    if not use_defaults or column.default is None or column.nullable or isinstance(column.default, Sequence):
+        default = None
+    else:
+        default = column.default.arg
+
+    for supported_type, field_type in column_to_field.items():
+        if isinstance(column.type, supported_type):
+            break
+    else:
+        return {}
+
+    if issubclass(field_type, JSONWithModelField):
+        if flatten_jsons and not column.type.as_list:
+            root_name: str = name
+            return {k: move_field_attribute(root_name, k, v) for k, v in column.type.model.items()}
+        field = NestedField(flask_restx_has_bad_design.model(column.type.model_name, column.type.model))
+        if column.type.as_list:
+            field = ListField(field)
+        # field: RawField = field_type.create(column, column_type, default)
+    else:
+        field = field_type(attribute=column.name, default=default)
+
+    return {name: field}
+
 
 @dataclass()
 class LambdaFieldDef:
@@ -119,7 +184,7 @@ def create_marshal_model(model_name: str, *fields: str, inherit: Union[str, None
     - Adds a marshal model to a database object, marked as :class:`Marshalable`.
     - Automatically adds all :class:`LambdaFieldDef`-marked class fields to the model.
     - Sorts modules keys by alphabet and puts ``id`` field on top if present.
-    - Uses kebab-case for json-names. TODO allow different cases
+    - Uses kebab-case for json-names. TODO allow different cases TODO move this TODO
 
     :param model_name: the **global** name for the new model or model to be overwritten.
     :param fields: filed names of columns to be added to the model.
@@ -129,46 +194,13 @@ def create_marshal_model(model_name: str, *fields: str, inherit: Union[str, None
     """
 
     def create_marshal_model_wrapper(cls):
-        def move_field_attribute(root_name: str, field_name: str, field_def: Union[Type[RawField], RawField]):
-            attribute_name: str = f"{root_name}.{field_name}"
-            if isinstance(field_def, type):
-                return field_def(attribute=attribute_name)
-            field_def.attribute = attribute_name
-            return field_def
-
-        def create_fields(column: Column, column_type: Union[Type[TypeEngine], TypeEngine]) -> dict[str, ...]:
-            if not use_defaults or column.default is None or column.nullable or isinstance(column.default, Sequence):
-                default = None
-            else:
-                default = column.default.arg
-
-            field_type: Type[RawField] = column_to_field[column_type]
-            if issubclass(field_type, JSONWithModelField):
-                if flatten_jsons and not column.type.as_list:
-                    root_name: str = column.name.replace("_", "-")
-                    return {k: move_field_attribute(root_name, k, v) for k, v in column.type.model.items()}
-                field = NestedField(flask_restx_has_bad_design.model(column.type.model_name, column.type.model))
-                if column.type.as_list:
-                    field = ListField(field)
-                # field: RawField = field_type.create(column, column_type, default)
-            else:
-                field = field_type(attribute=column.name, default=default)
-
-            return {column.name.replace("_", "-"): field}
-
-        def detect_field_type(column):
-            for supported_type in column_to_field.keys():
-                if isinstance(column.type, supported_type):
-                    return supported_type
-
         model_dict = {} if inherit is None else cls.marshal_models[inherit].copy()
 
         model_dict.update({
             k: v
             for column in cls.__table__.columns
             if column.name in fields
-            if (field_type := detect_field_type(column)) is not None
-            for k, v in create_fields(column, field_type).items()
+            for k, v in create_fields(column, column.name.replace("_", "-"), use_defaults, flatten_jsons).items()
         })
 
         model_dict.update({
