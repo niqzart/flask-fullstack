@@ -3,14 +3,15 @@ from __future__ import annotations
 from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Type, Union, get_type_hints, Callable
+from typing import Type, Sequence, Union, get_type_hints, Callable, TypeVar
 
-from flask_restx import Model, Namespace
-from flask_restx.fields import (Raw as RawField, Nested as NestedField, List as ListField,
-                                Boolean as BooleanField, Integer as IntegerField, String as StringField)
-from sqlalchemy import Column, Sequence, Enum
+from flask_restx import Model as _Model, Namespace
+from flask_restx.fields import (Boolean as BooleanField, Integer as IntegerField, Float as FloatField,
+                                String as StringField, Raw as RawField, Nested as NestedField, List as ListField)
+from flask_restx.reqparse import RequestParser
+from sqlalchemy import Column, Sequence, Float
 from sqlalchemy.sql.type_api import TypeEngine
-from sqlalchemy.types import Boolean, Integer, String, JSON, DateTime
+from sqlalchemy.types import Boolean, Integer, String, JSON, DateTime, Enum
 
 from .sqlalchemy import JSONWithModel
 from .utils import TypeEnum
@@ -65,6 +66,7 @@ class JSONWithModelField:  # (ConfigurableField):
 type_to_field: dict[type, Type[RawField]] = {
     bool: BooleanField,
     int: IntegerField,
+    float: FloatField,
     str: StringField,
     JSON: JSONLoadableField,
     datetime: DateTimeField,
@@ -77,6 +79,7 @@ column_to_field: dict[Type[TypeEngine], Type[RawField]] = {
     Enum: EnumField,
     Boolean: BooleanField,
     Integer: IntegerField,
+    Float: FloatField,
     String: StringField,
 }
 
@@ -84,6 +87,8 @@ column_to_field: dict[Type[TypeEngine], Type[RawField]] = {
 @dataclass()
 class LambdaFieldDef:
     """
+    DEPRECATED (in favour OF :class:`Model` below)
+
     A field to be used in create_marshal_model, which can't be described as a :class:`Column`.
 
     - model_name — global name of the model to connect the field to.
@@ -109,6 +114,8 @@ class LambdaFieldDef:
 def create_marshal_model(model_name: str, *fields: str, inherit: Union[str, None] = None,
                          use_defaults: bool = False, flatten_jsons: bool = False):
     """
+    DEPRECATED (in favour OF :class:`Model` below)
+
     - Adds a marshal model to a database object, marked as :class:`Marshalable`.
     - Automatically adds all :class:`LambdaFieldDef`-marked class fields to the model.
     - Sorts modules keys by alphabet and puts ``id`` field on top if present.
@@ -181,7 +188,9 @@ def create_marshal_model(model_name: str, *fields: str, inherit: Union[str, None
 
 
 class Marshalable:
-    """ Marker-class for classes that can be decorated with ``create_marshal_model`` """
+    """ DEPRECATED (in favour OF :class:`Model` below)
+    Marker-class for classes that can be decorated with ``create_marshal_model``
+    """
     marshal_models: dict[str, OrderedDict[str, Type[RawField]]] = {}
 
 
@@ -210,7 +219,7 @@ class ResponseDoc:
 
     code: Union[int, str] = 200
     description: str = None
-    model: Union[Model, None] = None
+    model: Union[_Model, None] = None
 
     @classmethod
     def error_response(cls, code: Union[int, str], description: str) -> ResponseDoc:
@@ -221,7 +230,31 @@ class ResponseDoc:
         if self.model is not None:
             self.model = ns.model(self.model.name, self.model)
 
-    def get_args(self) -> Union[tuple[Union[int, str], str], tuple[Union[int, str], str, Model]]:
+    def get_args(self) -> Union[tuple[Union[int, str], str], tuple[Union[int, str], str, _Model]]:
         if self.model is None:
             return self.code, self.description
         return self.code, self.description, self.model
+
+
+t = TypeVar("t", bound="Model")
+
+
+class Model:
+    """ A base class for models
+    Can be combined with dataclasses, Pydantic or Marshmallow to define fields
+    Instances will be passed as data for flask_restx's marshal function
+    """
+
+    @classmethod
+    def convert(cls: Type[t], orm_object) -> t:
+        raise NotImplementedError()
+
+    @classmethod
+    def model(cls) -> dict[str, Union[Type[RawField], RawField]]:
+        raise NotImplementedError()
+
+    @classmethod
+    def parser(cls, **kwargs) -> RequestParser:
+        raise NotImplementedError()
+
+    # TODO reverse of convert for parsing (see argument parser as well)
