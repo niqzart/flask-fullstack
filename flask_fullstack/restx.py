@@ -137,6 +137,9 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
         return lister_wrapper
 
     def model(self, name: str = None, model=None, **kwargs):
+        # TODO recursive registration
+        # TODO name as a class attribute of Model
+        # TODO auto-registration in marshal_with & lister
         if isinstance(model, Model):
             return super().model(name or Model.__name__, model.model(), **kwargs)
         return super().model(name, model, **kwargs)

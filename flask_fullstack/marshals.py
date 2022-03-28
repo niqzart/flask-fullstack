@@ -276,14 +276,15 @@ class Model:
     Can be combined with dataclasses, Pydantic or Marshmallow to define fields
     Instances will be passed as data for flask_restx's marshal function
     """
+
     @staticmethod
     def include_columns(*columns: Column, __use_defaults__: bool = False, __flatten_jsons__: bool = False,
                         **named_columns: Column) -> Callable[[Type[Model]], Type[Model]]:
         named_columns = {key.replace("_", "-"): value for key, value in named_columns.items()}
 
-        # Maybe allow *columns: Column to do this here:
-        # (doesn't work for models inside DB classes, as Column.name is populated later)
-        # named_columns.update({column.name.replace("_", "-"): column for column in columns})
+        # TODO Maybe allow *columns: Column to do this here:
+        #   (doesn't work for models inside DB classes, as Column.name is populated later)
+        #   named_columns.update({column.name.replace("_", "-"): column for column in columns})
 
         def include_columns_inner(cls: Type[Model]) -> Type[Model]:
             fields = {}
@@ -299,7 +300,8 @@ class Model:
                             fields.update(create_fields(column, name, __use_defaults__, __flatten_jsons__))
                         cls.__columns_converted__ = True
 
-                # TODO make model's ORM attributes usable (__init__?) OR use class properties for Columns in a different way
+                # TODO make model's ORM attributes usable (__init__?)
+                #   XOR use class properties for Columns in a different way
                 @classmethod
                 def convert(cls: Type[t], orm_object, **context) -> t:
                     cls.convert_columns()
