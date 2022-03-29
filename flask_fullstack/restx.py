@@ -1,14 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from functools import wraps
 from typing import Union
 
-from flask_restx import Namespace, Model, abort as default_abort
+from flask_restx import Namespace, Model as BaseModel, abort as default_abort
 from flask_restx.fields import List as ListField, Boolean as BoolField, Nested
 from flask_restx.marshalling import marshal
 from flask_restx.reqparse import RequestParser
 
-from .marshals import ResponseDoc
+from .marshals import ResponseDoc, Model
 from .mixins import DatabaseSearcherMixin, JWTAuthorizerMixin
 from .sqlalchemy import Sessionmaker
 
@@ -80,7 +81,22 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
         return doc_responses_wrapper
 
-    def lister(self, per_request: int, marshal_model: Model, skip_none: bool = True):
+    def marshal_with(self, fields: BaseModel | Model, **kwargs):
+        result = super().marshal_with(fields, **kwargs)
+        if isinstance(fields, Model):
+            def marshal_with_wrapper(function: Callable) -> Callable[..., Model]:
+                @wraps(function)
+                @result
+                def marshal_with_inner(*args, **kwargs):
+                    return fields.convert(function(*args, **kwargs), **kwargs)
+
+                return marshal_with_inner
+
+            return marshal_with_wrapper
+
+        return result
+
+    def lister(self, per_request: int, marshal_model: BaseModel | Model, skip_none: bool = True):
         """
         - Used for organising pagination.
         - Uses `counter` form incoming arguments for the decorated function and `per_request` argument
@@ -93,8 +109,16 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
         :param skip_none:
         :return:
         """
-        response = ResponseDoc(200, f"Max size of results: {per_request}", Model(f"List" + marshal_model.name, {
-            "results": ListField(Nested(marshal_model), max_items=per_request), "has-next": BoolField}))
+        if isinstance(marshal_model, Model):
+            model = marshal_model.model()
+            name = marshal_model.__name__
+        else:
+            model = marshal_model
+            name = marshal_model.name
+
+        response = {"results": ListField(Nested(model), max_items=per_request), "has-next": BoolField}
+        response = BaseModel(f"List" + name, response)
+        response = ResponseDoc(200, f"Max size of results: {per_request}", response)
 
         def lister_wrapper(function):
             @self.doc_responses(response)
@@ -114,8 +138,18 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
                 if has_next := len(result_list) > per_request:
                     result_list.pop()
 
-                return {"results": marshal(result_list, marshal_model, skip_none=skip_none), "has-next": has_next}
+                if isinstance(marshal_model, Model):
+                    result_list = [marshal_model.convert(result) for result in result_list]
+                return {"results": marshal(result_list, model, skip_none=skip_none), "has-next": has_next}
 
             return lister_inner
 
         return lister_wrapper
+
+    def model(self, name: str = None, model=None, **kwargs):
+        # TODO recursive registration
+        # TODO name as a class attribute of Model
+        # TODO auto-registration in marshal_with & lister
+        if isinstance(model, Model):
+            return super().model(name or Model.__name__, model.model(), **kwargs)
+        return super().model(name, model, **kwargs)
