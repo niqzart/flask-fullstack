@@ -400,3 +400,17 @@ class PydanticModel(BaseModel, Model, ABC):
                 raise ValueError("Nested structures are not supported")  # TODO flat-nested fields support
             parser.add_argument(field.alias, dest=name, type=field.type_, **pydantic_field_to_kwargs(field), **kwargs)
         return parser
+
+    @classmethod
+    def callback_convert(cls, callback: Callable, orm_object, **context) -> None:
+        raise NotImplementedError
+
+    @classmethod
+    def dict_convert(cls, orm_object, **context) -> dict[str, ...]:
+        result = {}
+        cls.callback_convert(result.update, orm_object, **context)
+        return result
+
+    @classmethod
+    def convert(cls: Type[t], orm_object, **context) -> t:
+        return cls(**cls.dict_convert(orm_object, **context))
