@@ -271,7 +271,7 @@ class ResponseDoc:
 t = TypeVar("t", bound="Model")
 
 
-class Model:
+class Model:  # TODO registered: _Model field
     """ A base class for models
     Can be combined with dataclasses, Pydantic or Marshmallow to define fields
     Instances will be passed as data for flask_restx's marshal function
@@ -286,7 +286,7 @@ class Model:
         #   (doesn't work for models inside DB classes, as Column.name is populated later)
         #   named_columns.update({column.name.replace("_", "-"): column for column in columns})
 
-        def include_columns_inner(cls: Type[Model]) -> Type[Model]:
+        def include_columns_inner(cls: Type[Model]) -> Type[Model]:  # TODO allow None for column-only models
             fields = {}
 
             class ModModel(cls):
@@ -330,7 +330,7 @@ class Model:
         return include_columns_inner
 
     @staticmethod
-    def include_model(model: Model) -> Callable[[Type[Model]], Type[Model]]:
+    def include_model(model: Type[Model]) -> Callable[[Type[Model]], Type[Model]]:
         def include_model_inner(cls: Type[Model]) -> Type[Model]:
             class ModModel(cls, model):
                 pass
@@ -350,7 +350,7 @@ class Model:
                     assert all((value := context.get(name, None)) is not None
                                and isinstance(value, var_type)
                                for name, var_type in var_types.items()), \
-                        "Context was not filled properly"
+                        "Context was not filled properly"  # TODO better error messages!
                     return super().convert(orm_object, **context)
 
             return ModModel
