@@ -290,11 +290,14 @@ class Model:  # TODO registered: _Model field
             fields = {}
 
             class ModModel(cls):
+                __qualname__ = cls.__qualname__  # TODO use a different attribute!
                 __columns_converted__ = False
 
                 @classmethod
                 def convert_columns(cls):  # TODO find a better way
                     if not cls.__columns_converted__:
+                        if hasattr(super(), "convert_columns"):
+                            super().convert_columns()  # noqa
                         named_columns.update({column.name.replace("_", "-"): column for column in columns})
                         for name, column in named_columns.items():
                             fields.update(create_fields(column, name, __use_defaults__, __flatten_jsons__))
@@ -333,7 +336,7 @@ class Model:  # TODO registered: _Model field
     def include_model(model: Type[Model]) -> Callable[[Type[Model]], Type[Model]]:
         def include_model_inner(cls: Type[Model]) -> Type[Model]:
             class ModModel(cls, model):
-                pass
+                __qualname__ = cls.__qualname__  # TODO use a different attribute!
 
             return ModModel
 
@@ -345,6 +348,8 @@ class Model:  # TODO registered: _Model field
 
         def include_context_inner(cls: Type[Model]) -> Type[Model]:
             class ModModel(cls):
+                __qualname__ = cls.__qualname__  # TODO use a different attribute!
+
                 @classmethod
                 def convert(cls: Type[t], orm_object, **context) -> t:
                     assert all((value := context.get(name, None)) is not None
