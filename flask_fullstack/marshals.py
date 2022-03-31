@@ -4,7 +4,7 @@ from abc import ABC
 from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Type, Sequence, Union, get_type_hints, Callable, TypeVar
+from typing import Type, Sequence, Union, get_type_hints, Callable, TypeVar, ForwardRef
 
 from flask_restx import Model as _Model, Namespace
 from flask_restx.fields import (Boolean as BooleanField, Integer as IntegerField, Float as FloatField,
@@ -375,8 +375,11 @@ class Model:  # TODO registered: _Model field
 class PydanticModel(BaseModel, Model, ABC):
     @staticmethod
     def pydantic_to_restx_field(field: ModelField) -> RawField:
+        if isinstance(field.type_, ForwardRef):
+            raise NotImplementedError()
+
         if issubclass(field.type_, Model):
-            result = NestedField(flask_restx_has_bad_design.model(field.type_.model()))
+            result = NestedField(flask_restx_has_bad_design.model(field.type_.__qualname__, field.type_.model()))
         else:
             result = type_to_field[field.type_](**pydantic_field_to_kwargs(field))
 
