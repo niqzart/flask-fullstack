@@ -293,6 +293,12 @@ class Model:  # TODO registered: _Model field
                 __qualname__ = cls.__qualname__  # TODO use a different attribute!
                 __columns_converted__ = False
 
+                def __init__(self, **kwargs):  # TODO redo
+                    super().__init__(**kwargs)
+                    self.convert_columns()
+                    for column in named_columns.values():
+                        object.__setattr__(self, column.name, kwargs.get(column.name, None))
+
                 @classmethod
                 def convert_columns(cls):  # TODO find a better way
                     if not cls.__columns_converted__:
