@@ -296,8 +296,8 @@ class Model:  # TODO registered: _Model field
                 def __init__(self, **kwargs):  # TODO redo
                     super().__init__(**kwargs)
                     self.convert_columns()
-                    for column in named_columns.values():
-                        object.__setattr__(self, column.name, kwargs.get(column.name, None))
+                    for name, column in named_columns.items():
+                        object.__setattr__(self, column.name, kwargs.get(name, None))
 
                 @classmethod
                 def convert_columns(cls):  # TODO find a better way
