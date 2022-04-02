@@ -123,7 +123,7 @@ def move_field_attribute(root_name: str, field_name: str, field_def: Type[RawFie
 
 
 def create_fields(column: Column, name: str, use_defaults: bool = False,
-                  flatten_jsons: bool = False) -> dict[str, ...]:
+                  flatten_jsons: bool = False, attribute: str = None) -> dict[str, ...]:
     if not use_defaults or column.default is None or column.nullable or isinstance(column.default, Sequence):
         default = None
     else:
@@ -144,7 +144,7 @@ def create_fields(column: Column, name: str, use_defaults: bool = False,
             field = ListField(field)
         # field: RawField = field_type.create(column, column_type, default)
     else:
-        field = field_type(attribute=column.name, default=default)
+        field = field_type(attribute=attribute or column.name, default=default)
 
     return {name: field}
 
@@ -293,12 +293,6 @@ class Model:  # TODO registered: _Model field
                 __qualname__ = cls.__qualname__  # TODO use a different attribute!
                 __columns_converted__ = False
 
-                def __init__(self, **kwargs):  # TODO redo
-                    super().__init__(**kwargs)
-                    self.convert_columns()
-                    for name, column in named_columns.items():
-                        object.__setattr__(self, column.name, kwargs.get(name, None))
-
                 @classmethod
                 def convert_columns(cls):  # TODO find a better way
                     if not cls.__columns_converted__:
@@ -306,7 +300,7 @@ class Model:  # TODO registered: _Model field
                             super().convert_columns()  # noqa
                         named_columns.update({column.name.replace("_", "-"): column for column in columns})
                         for name, column in named_columns.items():
-                            fields.update(create_fields(column, name, __use_defaults__, __flatten_jsons__))
+                            fields.update(create_fields(column, name, __use_defaults__, __flatten_jsons__, name))
                         cls.__columns_converted__ = True
 
                 # TODO make model's ORM attributes usable (__init__?)
@@ -315,14 +309,22 @@ class Model:  # TODO registered: _Model field
                 def convert(cls: Type[t], orm_object, **context) -> t:
                     cls.convert_columns()
                     result: cls = super().convert(orm_object, **context)
-                    for column in named_columns.values():
-                        object.__setattr__(result, column.name, getattr(orm_object, column.name))
+                    for name, column in named_columns.items():
+                        object.__setattr__(result, name, getattr(orm_object, column.name))
                     return result
 
                 @classmethod
                 def model(cls) -> dict[str, RawField]:
                     cls.convert_columns()
                     return dict(super().model(), **fields)
+
+                @classmethod
+                def deconvert(cls: Type[t], data: dict[str, ...]) -> t:
+                    cls.convert_columns()
+                    result: cls = super().deconvert(data)
+                    for name, column in named_columns.items():
+                        object.__setattr__(result, column.name, data[name])
+                    return result
 
                 @classmethod
                 def parser(cls, **kwargs) -> RequestParser:
@@ -377,10 +379,13 @@ class Model:  # TODO registered: _Model field
         raise NotImplementedError()
 
     @classmethod
-    def parser(cls, **kwargs) -> RequestParser:
+    def deconvert(cls: Type[t], data: dict[str, ...]) -> t:
+        # TODO version of deconvert for parsing (see argument parser as well)
         raise NotImplementedError()
 
-    # TODO reverse of convert for parsing (see argument parser as well)
+    @classmethod
+    def parser(cls, **kwargs) -> RequestParser:
+        raise NotImplementedError()
 
 
 class PydanticModel(BaseModel, Model, ABC):
@@ -428,3 +433,11 @@ class PydanticModel(BaseModel, Model, ABC):
     @classmethod
     def convert(cls: Type[t], orm_object, **context) -> t:
         return cls(**cls.dict_convert(orm_object, **context))
+
+    @classmethod
+    def parse_obj(cls: Type[t], obj: ...) -> t:
+        return cls.deconvert(obj)
+
+    @classmethod
+    def deconvert(cls: Type[t], data: dict[str, ...]) -> t:
+        return super().parse_obj(data)
