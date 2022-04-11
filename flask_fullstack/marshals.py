@@ -291,14 +291,14 @@ class Model:  # TODO registered: _Model field
 
     @staticmethod
     def include_columns(*columns: Column, __use_defaults__: bool = False, __flatten_jsons__: bool = False,
-                        **named_columns: Column) -> Callable[[Type[Model]], Type[Model]]:
+                        **named_columns: Column) -> Callable[[Type[t]], Type[t]]:
         named_columns = {key.replace("_", "-"): value for key, value in named_columns.items()}
 
         # TODO Maybe allow *columns: Column to do this here:
         #   (doesn't work for models inside DB classes, as Column.name is populated later)
         #   named_columns.update({column.name.replace("_", "-"): column for column in columns})
 
-        def include_columns_inner(cls: Type[Model]) -> Type[Model]:  # TODO allow None for column-only models
+        def include_columns_inner(cls: Type[t]) -> Type[t]:  # TODO allow None for column-only models
             fields = {}
 
             class ModModel(cls):
@@ -353,8 +353,8 @@ class Model:  # TODO registered: _Model field
         return include_columns_inner
 
     @staticmethod
-    def include_model(model: Type[Model]) -> Callable[[Type[Model]], Type[Model]]:
-        def include_model_inner(cls: Type[Model]) -> Type[Model]:
+    def include_model(model: Type[Model]) -> Callable[[Type[t]], Type[t]]:
+        def include_model_inner(cls: Type[t]) -> Type[t]:
             class ModModel(cls, model):
                 __qualname__ = cls.__qualname__  # TODO use a different attribute!
 
@@ -363,10 +363,10 @@ class Model:  # TODO registered: _Model field
         return include_model_inner
 
     @staticmethod
-    def include_context(*names, **var_types):  # TODO Maybe redo
+    def include_context(*names, **var_types) -> Callable[[Type[t]], Type[t]]:  # TODO Maybe redo
         var_types.update({name: object for name in names})
 
-        def include_context_inner(cls: Type[Model]) -> Type[Model]:
+        def include_context_inner(cls: Type[t]) -> Type[t]:
             class ModModel(cls):
                 __qualname__ = cls.__qualname__  # TODO use a different attribute!
 
