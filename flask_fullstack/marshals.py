@@ -136,10 +136,15 @@ def create_fields(column: Column, name: str, use_defaults: bool = False,
         return {}
 
     if issubclass(field_type, JSONWithModelField):
-        if flatten_jsons and not column.type.as_list:
+        json_type: JSONWithModel = column.type
+
+        if flatten_jsons and not json_type.as_list:
             root_name: str = name
-            return {k: move_field_attribute(root_name, k, v) for k, v in column.type.model.items()}
-        field = NestedField(flask_restx_has_bad_design.model(column.type.model_name, column.type.model))
+            return {k: move_field_attribute(root_name, k, v) for k, v in json_type.model.items()}
+
+        field = json_type.model
+        if isinstance(json_type.model, dict):
+            field = NestedField(flask_restx_has_bad_design.model(json_type.model_name, field))
         if column.type.as_list:
             field = ListField(field)
         # field: RawField = field_type.create(column, column_type, default)
