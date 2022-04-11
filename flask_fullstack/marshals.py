@@ -144,7 +144,14 @@ def create_fields(column: Column, name: str, use_defaults: bool = False,
             field = ListField(field)
         # field: RawField = field_type.create(column, column_type, default)
     else:
-        field = field_type(attribute=attribute or column.name, default=default)
+        kwargs = {"attribute": attribute or column.name, "default": default}
+        if field_type == EnumField:
+            enum = column.type.enum_class
+            if isinstance(enum, type) and issubclass(enum, TypeEnum):
+                kwargs["enum"] = enum.get_all_field_names()
+            else:
+                kwargs["enum"] = column.type.enums
+        field = field_type(**kwargs)
 
     return {name: field}
 
