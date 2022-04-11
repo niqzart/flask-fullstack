@@ -12,7 +12,7 @@ from flask_restx.fields import (Boolean as BooleanField, Integer as IntegerField
 from flask_restx.reqparse import RequestParser
 from pydantic import BaseModel
 from pydantic.fields import ModelField
-from sqlalchemy import Column, Sequence, Float
+from sqlalchemy import Column, Sequence, Float, ARRAY
 from sqlalchemy.sql.type_api import TypeEngine
 from sqlalchemy.types import Boolean, Integer, String, JSON, DateTime, Enum
 
@@ -129,13 +129,17 @@ def create_fields(column: Column, name: str, use_defaults: bool = False,
     else:
         default = column.default.arg
 
+    column_type = column.type
+    if isinstance(column_type, ARRAY):
+        column_type = column_type.item_type
+
     for supported_type, field_type in column_to_field.items():
-        if isinstance(column.type, supported_type):
+        if isinstance(column_type, supported_type):
             break
     else:
         return {}
 
-    if issubclass(field_type, JSONWithModelField):
+    if issubclass(field_type, JSONWithModelField) and not isinstance(column.type, ARRAY):
         if flatten_jsons and not column.type.as_list:
             root_name: str = name
             return {k: move_field_attribute(root_name, k, v) for k, v in column.type.model.items()}
@@ -144,14 +148,18 @@ def create_fields(column: Column, name: str, use_defaults: bool = False,
             field = ListField(field)
         # field: RawField = field_type.create(column, column_type, default)
     else:
-        kwargs = {"attribute": attribute or column.name, "default": default}
+        kwargs = {"default": default}
         if field_type == EnumField:
-            enum = column.type.enum_class
+            enum = column_type.enum_class
             if isinstance(enum, type) and issubclass(enum, TypeEnum):
                 kwargs["enum"] = enum.get_all_field_names()
             else:
                 kwargs["enum"] = column.type.enums
-        field = field_type(**kwargs)
+
+        if isinstance(column.type, ARRAY):
+            field = ListField(field_type(**kwargs), attribute=attribute or column.name)
+        else:
+            field = field_type(attribute=attribute or column.name, **kwargs)
 
     return {name: field}
 
