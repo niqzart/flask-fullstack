@@ -5,7 +5,7 @@ from functools import wraps
 from typing import Union, Type
 
 from flask_restx import Namespace, Model as BaseModel, abort as default_abort
-from flask_restx.fields import List as ListField, Boolean as BoolField, Nested
+from flask_restx.fields import List as ListField, Boolean as BoolField, Integer as IntegerField, Nested
 from flask_restx.marshalling import marshal
 from flask_restx.reqparse import RequestParser
 
@@ -97,7 +97,8 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
         return result(fields, **kwargs)
 
-    def lister(self, per_request: int, marshal_model: BaseModel | Type[Model], skip_none: bool = True):
+    def lister(self, per_request: int, marshal_model: BaseModel | Type[Model], skip_none: bool = True,
+               count_all: Callable[..., int] | None = None):
         """
         - Used for organising pagination.
         - Uses `counter` form incoming arguments for the decorated function and `per_request` argument
@@ -108,6 +109,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
         :param per_request:
         :param marshal_model:
         :param skip_none:
+        :param count_all:
         :return:
         """
         if isinstance(marshal_model, type) and issubclass(marshal_model, Model):
@@ -118,6 +120,8 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
             model = marshal_model
 
         response = {"results": ListField(Nested(model), max_items=per_request), "has-next": BoolField}
+        if count_all is not None:
+            response["total"] = IntegerField
         response = BaseModel(f"List" + name, response)
         response = ResponseDoc(200, f"Max size of results: {per_request}", response)
 
@@ -141,7 +145,10 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
                 if isinstance(marshal_model, type) and issubclass(marshal_model, Model):
                     result_list = [marshal_model.convert(result, **kwargs) for result in result_list]
-                return {"results": marshal(result_list, model, skip_none=skip_none), "has-next": has_next}
+                result = {"results": marshal(result_list, model, skip_none=skip_none), "has-next": has_next}
+                if count_all is not None:
+                    result["total"] = count_all(*args, **kwargs)
+                return result
 
             return lister_inner
 
