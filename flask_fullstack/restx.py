@@ -98,7 +98,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
         return result(fields, **kwargs)
 
     def lister(self, per_request: int, marshal_model: BaseModel | Type[Model], skip_none: bool = True,
-               count_all: Callable[..., int] | None = None):
+               count_all: Callable[..., int] | None = None, provided_total: bool = False):
         """
         - Used for organising pagination.
         - Uses `counter` form incoming arguments for the decorated function and `per_request` argument
@@ -110,6 +110,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
         :param marshal_model:
         :param skip_none:
         :param count_all:
+        :param provided_total:
         :return:
         """
         if isinstance(marshal_model, type) and issubclass(marshal_model, Model):
@@ -120,7 +121,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
             model = marshal_model
 
         response = {"results": ListField(Nested(model), max_items=per_request), "has-next": BoolField}
-        if count_all is not None:
+        if count_all is not None or provided_total:
             response["total"] = IntegerField
         response = BaseModel(f"List" + name, response)
         response = ResponseDoc(200, f"Max size of results: {per_request}", response)
@@ -139,6 +140,9 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
                 kwargs["start"] = offset
                 kwargs["finish"] = offset + per_request + 1
                 result_list = function(*args, **kwargs)
+                if provided_total:
+                    total = result_list[1]
+                    result_list = result_list[0]
 
                 if has_next := len(result_list) > per_request:
                     result_list.pop()
@@ -148,6 +152,8 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
                 result = {"results": marshal(result_list, model, skip_none=skip_none), "has-next": has_next}
                 if count_all is not None:
                     result["total"] = count_all(*args, **kwargs)
+                if provided_total:
+                    result["total"] = total
                 return result
 
             return lister_inner
