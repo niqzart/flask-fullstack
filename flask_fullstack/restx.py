@@ -97,6 +97,11 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
         return result(fields, *args, **kwargs)
 
+    def marshal(self, data, fields: Type[Model] | ..., *args, **kwargs):
+        if isinstance(fields, type) and issubclass(fields, Model):
+            fields = self.models[fields.__qualname__]
+        return marshal(data, fields, *args, **kwargs)
+
     def lister(self, per_request: int, marshal_model: BaseModel | Type[Model], skip_none: bool = True,
                count_all: Callable[..., int] | None = None, provided_total: bool = False):
         """
