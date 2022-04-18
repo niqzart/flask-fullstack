@@ -352,6 +352,14 @@ class Model:  # TODO registered: _Model field
 
         return include_columns_inner
 
+    @classmethod
+    def column_only_model(cls: Type[t], name: str, *columns: Column, **kwargs) -> Type[t]:
+        @cls.include_columns(*columns, **kwargs)
+        class ModModel(cls):
+            __qualname__ = name  # TODO use a different attribute!
+
+        return ModModel
+
     @staticmethod
     def include_model(model: Type[Model]) -> Callable[[Type[t]], Type[t]]:
         def include_model_inner(cls: Type[t]) -> Type[t]:
@@ -434,7 +442,7 @@ class PydanticModel(BaseModel, Model, ABC):
 
     @classmethod
     def callback_convert(cls, callback: Callable, orm_object, **context) -> None:
-        raise NotImplementedError
+        pass
 
     @classmethod
     def dict_convert(cls, orm_object, **context) -> dict[str, ...]:
