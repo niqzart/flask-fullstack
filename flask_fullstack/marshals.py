@@ -434,7 +434,8 @@ class PydanticModel(BaseModel, Model, ABC):
 
     @classmethod
     def model(cls) -> dict[str, RawField]:
-        return {field.alias: PydanticModel.pydantic_to_restx_field(field) for name, field in cls.__fields__.items()}
+        return {field.alias.replace("_", "-"): PydanticModel.pydantic_to_restx_field(field)
+                for name, field in cls.__fields__.items()}
 
     @classmethod
     def parser(cls, **kwargs) -> RequestParser:
@@ -445,7 +446,8 @@ class PydanticModel(BaseModel, Model, ABC):
                 kwargs["action"] = "append"
             elif field.is_complex():
                 raise ValueError("Nested structures are not supported")  # TODO flat-nested fields support
-            parser.add_argument(field.alias, dest=name, type=field.type_, **pydantic_field_to_kwargs(field), **kwargs)
+            parser.add_argument(field.alias.replace("_", "-"), dest=name, type=field.type_,
+                                **pydantic_field_to_kwargs(field), **kwargs)
         return parser
 
     @classmethod
