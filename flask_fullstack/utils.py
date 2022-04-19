@@ -36,11 +36,11 @@ class Nameable:
 
 
 class NamedPropertiesMeta(type):
-    def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, ...]):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, ...]):
         for name, value in namespace.items():
-            if isinstance(value, type) and issubclass(value, Nameable):
+            if isinstance(value, type) and issubclass(value, Nameable) and value.name is None:
                 value.name = namespace["__qualname__"] + "." + name
-        return type.__new__(mcs, name, bases, namespace)
+        super().__init__(name, bases, namespace)
 
 
 class NamedProperties(metaclass=NamedPropertiesMeta):

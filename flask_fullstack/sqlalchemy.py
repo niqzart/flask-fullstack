@@ -6,10 +6,10 @@ from typing import TypeVar, Type
 from flask_restx.fields import Raw as RawField
 from sqlalchemy import JSON, MetaData, select
 from sqlalchemy.engine import Row
-from sqlalchemy.orm import sessionmaker, declarative_base, Session as _Session
+from sqlalchemy.orm import sessionmaker, declarative_base, Session as _Session, DeclarativeMeta
 from sqlalchemy.sql import Select
 
-from .utils import NamedProperties
+from .utils import NamedPropertiesMeta, Nameable
 
 
 class Session(_Session):
@@ -77,7 +77,11 @@ class JSONWithSchema(JSON):
 t = TypeVar("t", bound="ModBase")
 
 
-class ModBase(NamedProperties):
+class ModBaseMeta(DeclarativeMeta, NamedPropertiesMeta):
+    pass
+
+
+class ModBase:
     @classmethod
     def create(cls: Type[t], session: Session, **kwargs) -> t:
         entry = cls(**kwargs)
@@ -123,4 +127,5 @@ class ModBase(NamedProperties):
 
 
 def create_base(meta: MetaData) -> Type[ModBase]:
-    return declarative_base(metadata=meta, cls=ModBase)
+    # noinspection PyTypeChecker
+    return declarative_base(metadata=meta, cls=ModBase, metaclass=ModBaseMeta)

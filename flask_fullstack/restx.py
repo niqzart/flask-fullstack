@@ -170,5 +170,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
     def model(self, name: str = None, model=None, **kwargs):
         # TODO recursive registration
         if isinstance(model, type) and issubclass(model, Model):
+            if model.name is None:
+                model.name = name or model.__qualname__
             return super().model(name or model.name, model.model(), **kwargs)
         return super().model(name, model, **kwargs)
