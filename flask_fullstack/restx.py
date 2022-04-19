@@ -87,7 +87,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
         if isinstance(fields, type) and issubclass(fields, Model):
             def marshal_with_wrapper(function: Callable) -> Callable[..., Model]:
                 @wraps(function)
-                @result(self.models[fields.__qualname__], *args, **kwargs)
+                @result(self.models[fields.name], *args, **kwargs)
                 def marshal_with_inner(*args, **kwargs):
                     return fields.convert(function(*args, **kwargs), **kwargs)
 
@@ -99,7 +99,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
     def marshal(self, data, fields: Type[Model] | ..., *args, **kwargs):
         if isinstance(fields, type) and issubclass(fields, Model):
-            fields = self.models[fields.__qualname__]
+            fields = self.models[fields.name]
         return marshal(data, fields, *args, **kwargs)
 
     def lister(self, per_request: int, marshal_model: BaseModel | Type[Model], skip_none: bool = True,
@@ -119,7 +119,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
         :return:
         """
         if isinstance(marshal_model, type) and issubclass(marshal_model, Model):
-            name = marshal_model.__qualname__
+            name = marshal_model.name
             model = self.models[name]
         else:
             name = marshal_model.name
@@ -167,8 +167,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
     def model(self, name: str = None, model=None, **kwargs):
         # TODO recursive registration
-        # TODO name as a class attribute of Model
         # TODO auto-registration in marshal_with & lister
         if isinstance(model, type) and issubclass(model, Model):
-            return super().model(name or model.__qualname__, model.model(), **kwargs)
+            return super().model(name or model.name, model.model(), **kwargs)
         return super().model(name, model, **kwargs)

@@ -17,7 +17,7 @@ from sqlalchemy.sql.type_api import TypeEngine
 from sqlalchemy.types import Boolean, Integer, String, JSON, DateTime, Enum
 
 from .sqlalchemy import JSONWithModel
-from .utils import TypeEnum
+from .utils import TypeEnum, Nameable
 
 
 class EnumField(StringField):
@@ -283,14 +283,14 @@ class ResponseDoc:
 t = TypeVar("t", bound="Model")
 
 
-class Model:  # TODO registered: _Model field
+class Model(Nameable):
     """ A base class for models
     Can be combined with dataclasses, Pydantic or Marshmallow to define fields
     Instances will be passed as data for flask_restx's marshal function
     """
 
     @staticmethod
-    def include_columns(*columns: Column, __use_defaults__: bool = False, __flatten_jsons__: bool = False,
+    def include_columns(*columns: Column, _use_defaults: bool = False, _flatten_jsons: bool = False,
                         **named_columns: Column) -> Callable[[Type[t]], Type[t]]:
         named_columns = {key.replace("_", "-"): value for key, value in named_columns.items()}
 
@@ -302,7 +302,6 @@ class Model:  # TODO registered: _Model field
             fields = {}
 
             class ModModel(cls):
-                __qualname__ = cls.__qualname__  # TODO use a different attribute!
                 __columns_converted__ = False
 
                 @classmethod
@@ -312,7 +311,7 @@ class Model:  # TODO registered: _Model field
                             super().convert_columns()  # noqa
                         named_columns.update({column.name.replace("_", "-"): column for column in columns})
                         for name, column in named_columns.items():
-                            fields.update(create_fields(column, name, __use_defaults__, __flatten_jsons__, name))
+                            fields.update(create_fields(column, name, _use_defaults, _flatten_jsons, name))
                         cls.__columns_converted__ = True
 
                 # TODO make model's ORM attributes usable (__init__?)
@@ -353,10 +352,19 @@ class Model:  # TODO registered: _Model field
         return include_columns_inner
 
     @classmethod
-    def column_only_model(cls: Type[t], name: str, *columns: Column, **kwargs) -> Type[t]:
+    def named_column_model(cls: Type[t], _name: str, *columns: Column, **kwargs) -> Type[t]:
         @cls.include_columns(*columns, **kwargs)
         class ModModel(cls):
-            __qualname__ = name  # TODO use a different attribute!
+            name = _name
+
+        return ModModel
+
+    @classmethod
+    def column_model(cls: Type[t], *columns: Column, **kwargs) -> Type[t]:
+        # only use as a property in a subclass of NamedProperties!
+        @cls.include_columns(*columns, **kwargs)
+        class ModModel(cls):
+            pass
 
         return ModModel
 
@@ -364,7 +372,7 @@ class Model:  # TODO registered: _Model field
     def include_model(model: Type[Model]) -> Callable[[Type[t]], Type[t]]:
         def include_model_inner(cls: Type[t]) -> Type[t]:
             class ModModel(cls, model):
-                __qualname__ = cls.__qualname__  # TODO use a different attribute!
+                pass
 
             return ModModel
 
@@ -376,8 +384,6 @@ class Model:  # TODO registered: _Model field
 
         def include_context_inner(cls: Type[t]) -> Type[t]:
             class ModModel(cls):
-                __qualname__ = cls.__qualname__  # TODO use a different attribute!
-
                 @classmethod
                 def convert(cls: Type[t], orm_object, **context) -> t:
                     assert all((value := context.get(name, None)) is not None
