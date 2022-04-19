@@ -9,6 +9,8 @@ from sqlalchemy.engine import Row
 from sqlalchemy.orm import sessionmaker, declarative_base, Session as _Session
 from sqlalchemy.sql import Select
 
+from .utils import NamedProperties
+
 
 class Session(_Session):
     def get_first(self, stmt: Select) -> object | None:
@@ -75,7 +77,7 @@ class JSONWithSchema(JSON):
 t = TypeVar("t", bound="ModBase")
 
 
-class ModBase:
+class ModBase(NamedProperties):
     @classmethod
     def create(cls: Type[t], session: Session, **kwargs) -> t:
         entry = cls(**kwargs)
@@ -113,7 +115,7 @@ class ModBase:
     def find_paginated_rows_by_kwargs(cls, session, offset: int, limit: int, *order_by, **kwargs) -> list[Row]:
         return session.get_paginated_rows(cls.select_by_kwargs(*order_by, **kwargs), offset, limit)
 
-    # TODO find_by_... with reflection
+    # TODO find_by_... with reflection or metaclasses
 
     def delete(self, session: Session) -> None:
         session.delete(self)

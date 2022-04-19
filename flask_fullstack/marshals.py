@@ -31,7 +31,6 @@ class DateTimeField(StringField):
 
 
 class JSONLoadableField(RawField):
-    # TODO https://docs.sqlalchemy.org/en/14/core/type_basics.html#sqlalchemy.types.JSON
     def format(self, value):
         return value
 
@@ -111,7 +110,7 @@ def sqlalchemy_column_to_kwargs(column: Column) -> dict[str, ...] | None:
         return result
 
 
-flask_restx_has_bad_design: Namespace = Namespace("this-is-dumb")  # TODO fix by overriding the .model in Namespace!
+flask_restx_has_bad_design: Namespace = Namespace("this-is-dumb")
 
 
 def move_field_attribute(root_name: str, field_name: str, field_def: Type[RawField] | RawField):
@@ -196,7 +195,7 @@ def create_marshal_model(model_name: str, *fields: str, inherit: Union[str, None
     - Adds a marshal model to a database object, marked as :class:`Marshalable`.
     - Automatically adds all :class:`LambdaFieldDef`-marked class fields to the model.
     - Sorts modules keys by alphabet and puts ``id`` field on top if present.
-    - Uses kebab-case for json-names. TODO allow different cases TODO move this TODO
+    - Uses kebab-case for json-names.
 
     :param model_name: the **global** name for the new model or model to be overwritten.
     :param fields: filed names of columns to be added to the model.
@@ -293,19 +292,20 @@ class Model(Nameable):
     def include_columns(*columns: Column, _use_defaults: bool = False, _flatten_jsons: bool = False,
                         **named_columns: Column) -> Callable[[Type[t]], Type[t]]:
         named_columns = {key.replace("_", "-"): value for key, value in named_columns.items()}
+        # TODO allow different cases
 
         # TODO Maybe allow *columns: Column to do this here:
         #   (doesn't work for models inside DB classes, as Column.name is populated later)
         #   named_columns.update({column.name.replace("_", "-"): column for column in columns})
 
-        def include_columns_inner(cls: Type[t]) -> Type[t]:  # TODO allow None for column-only models
+        def include_columns_inner(cls: Type[t]) -> Type[t]:
             fields = {}
 
             class ModModel(cls):
                 __columns_converted__ = False
 
                 @classmethod
-                def convert_columns(cls):  # TODO find a better way
+                def convert_columns(cls):  # TODO find a better way, Nameable, perhaps?
                     if not cls.__columns_converted__:
                         if hasattr(super(), "convert_columns"):
                             super().convert_columns()  # noqa
@@ -367,6 +367,8 @@ class Model(Nameable):
             pass
 
         return ModModel
+
+    # TODO include_relationship decorator & relationship_model metagenerator-classmethod
 
     @staticmethod
     def include_model(model: Type[Model]) -> Callable[[Type[t]], Type[t]]:
