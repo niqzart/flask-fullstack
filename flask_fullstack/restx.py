@@ -101,7 +101,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
     def marshal(self, data, fields: Type[Model] | ..., *args, **kwargs):
         if isinstance(fields, type) and issubclass(fields, Model):
-            fields = self.models[fields.name]
+            fields = self.models.get(fields.name, None) or self.model(model=fields)
         return marshal(data, fields, *args, **kwargs)
 
     def lister(self, per_request: int, marshal_model: BaseModel | Type[Model], skip_none: bool = True,
