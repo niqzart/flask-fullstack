@@ -9,7 +9,7 @@ from sqlalchemy.engine import Row
 from sqlalchemy.orm import sessionmaker, declarative_base, Session as _Session, DeclarativeMeta
 from sqlalchemy.sql import Select
 
-from .utils import NamedPropertiesMeta, Nameable
+from .utils import Nameable, NamedPropertiesMeta
 
 
 class Session(_Session):
@@ -77,7 +77,7 @@ class JSONWithSchema(JSON):
 t = TypeVar("t", bound="ModBase")
 
 
-class ModBaseMeta(DeclarativeMeta, NamedPropertiesMeta):
+class ModBaseMeta(NamedPropertiesMeta, DeclarativeMeta):
     pass
 
 
