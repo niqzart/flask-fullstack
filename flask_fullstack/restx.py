@@ -85,9 +85,11 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
         result = super().marshal_with
 
         if isinstance(fields, type) and issubclass(fields, Model):
+            model = self.models.get(fields.name, None) or self.model(model=fields)
+
             def marshal_with_wrapper(function: Callable) -> Callable[..., Model]:
                 @wraps(function)
-                @result(self.models[fields.name], *args, **kwargs)
+                @result(model, *args, **kwargs)
                 def marshal_with_inner(*args, **kwargs):
                     return fields.convert(function(*args, **kwargs), **kwargs)
 
@@ -120,7 +122,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
         """
         if isinstance(marshal_model, type) and issubclass(marshal_model, Model):
             name = marshal_model.name
-            model = self.models[name]
+            model = self.models.get(name, None) or self.model(model=marshal_model)
         else:
             name = marshal_model.name
             model = marshal_model
@@ -167,7 +169,6 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
     def model(self, name: str = None, model=None, **kwargs):
         # TODO recursive registration
-        # TODO auto-registration in marshal_with & lister
         if isinstance(model, type) and issubclass(model, Model):
             return super().model(name or model.name, model.model(), **kwargs)
         return super().model(name, model, **kwargs)
