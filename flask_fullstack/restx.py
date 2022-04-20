@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from functools import wraps
-from typing import Union, Type
+from typing import Union, Type, Sequence
 
 from flask_restx import Namespace, Model as BaseModel, abort as default_abort
 from flask_restx.fields import List as ListField, Boolean as BoolField, Integer as IntegerField, Nested
@@ -101,6 +101,10 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
     def marshal(self, data, fields: Type[Model] | ..., *args, **kwargs):
         if isinstance(fields, type) and issubclass(fields, Model):
+            if isinstance(data, Sequence):
+                data = [fields.convert(d) for d in data]
+            else:
+                data = fields.convert(data)
             fields = self.models.get(fields.name, None) or self.model(model=fields)
         return marshal(data, fields, *args, **kwargs)
 
