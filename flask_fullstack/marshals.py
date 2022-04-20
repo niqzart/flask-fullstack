@@ -4,7 +4,7 @@ from abc import ABC
 from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Type, Sequence, Union, get_type_hints, Callable, TypeVar
+from typing import Type, Sequence, Union, get_type_hints, Callable, TypeVar, ForwardRef
 
 from flask_restx import Model as _Model, Namespace
 from flask_restx.fields import (Boolean as BooleanField, Integer as IntegerField, Float as FloatField,
@@ -17,7 +17,7 @@ from sqlalchemy.sql.type_api import TypeEngine
 from sqlalchemy.types import Boolean, Integer, String, JSON, DateTime, Enum
 
 from .sqlalchemy import JSONWithModel
-from .utils import TypeEnum
+from .utils import TypeEnum, Nameable
 
 
 class EnumField(StringField):
@@ -31,7 +31,6 @@ class DateTimeField(StringField):
 
 
 class JSONLoadableField(RawField):
-    # TODO https://docs.sqlalchemy.org/en/14/core/type_basics.html#sqlalchemy.types.JSON
     def format(self, value):
         return value
 
@@ -111,7 +110,7 @@ def sqlalchemy_column_to_kwargs(column: Column) -> dict[str, ...] | None:
         return result
 
 
-flask_restx_has_bad_design: Namespace = Namespace("this-is-dumb")  # TODO fix by overriding the .model in Namespace!
+flask_restx_has_bad_design: Namespace = Namespace("this-is-dumb")
 
 
 def move_field_attribute(root_name: str, field_name: str, field_def: Type[RawField] | RawField):
@@ -123,7 +122,7 @@ def move_field_attribute(root_name: str, field_name: str, field_def: Type[RawFie
 
 
 def create_fields(column: Column, name: str, use_defaults: bool = False,
-                  flatten_jsons: bool = False) -> dict[str, ...]:
+                  flatten_jsons: bool = False, attribute: str = None) -> dict[str, ...]:
     if not use_defaults or column.default is None or column.nullable or isinstance(column.default, Sequence):
         default = None
     else:
@@ -136,15 +135,27 @@ def create_fields(column: Column, name: str, use_defaults: bool = False,
         return {}
 
     if issubclass(field_type, JSONWithModelField):
-        if flatten_jsons and not column.type.as_list:
+        json_type: JSONWithModel = column.type
+
+        if flatten_jsons and not json_type.as_list:
             root_name: str = name
-            return {k: move_field_attribute(root_name, k, v) for k, v in column.type.model.items()}
-        field = NestedField(flask_restx_has_bad_design.model(column.type.model_name, column.type.model))
+            return {k: move_field_attribute(root_name, k, v) for k, v in json_type.model.items()}
+
+        field = json_type.model
+        if isinstance(json_type.model, dict):
+            field = NestedField(flask_restx_has_bad_design.model(json_type.model_name, field))
         if column.type.as_list:
             field = ListField(field)
         # field: RawField = field_type.create(column, column_type, default)
     else:
-        field = field_type(attribute=column.name, default=default)
+        kwargs = {"attribute": attribute or column.name, "default": default}
+        if field_type == EnumField:
+            enum = column.type.enum_class
+            if isinstance(enum, type) and issubclass(enum, TypeEnum):
+                kwargs["enum"] = enum.get_all_field_names()
+            else:
+                kwargs["enum"] = column.type.enums
+        field = field_type(**kwargs)
 
     return {name: field}
 
@@ -184,7 +195,7 @@ def create_marshal_model(model_name: str, *fields: str, inherit: Union[str, None
     - Adds a marshal model to a database object, marked as :class:`Marshalable`.
     - Automatically adds all :class:`LambdaFieldDef`-marked class fields to the model.
     - Sorts modules keys by alphabet and puts ``id`` field on top if present.
-    - Uses kebab-case for json-names. TODO allow different cases TODO move this TODO
+    - Uses kebab-case for json-names.
 
     :param model_name: the **global** name for the new model or model to be overwritten.
     :param fields: filed names of columns to be added to the model.
@@ -271,33 +282,36 @@ class ResponseDoc:
 t = TypeVar("t", bound="Model")
 
 
-class Model:
+class Model(Nameable):
     """ A base class for models
     Can be combined with dataclasses, Pydantic or Marshmallow to define fields
     Instances will be passed as data for flask_restx's marshal function
     """
 
     @staticmethod
-    def include_columns(*columns: Column, __use_defaults__: bool = False, __flatten_jsons__: bool = False,
-                        **named_columns: Column) -> Callable[[Type[Model]], Type[Model]]:
+    def include_columns(*columns: Column, _use_defaults: bool = False, _flatten_jsons: bool = False,
+                        **named_columns: Column) -> Callable[[Type[t]], Type[t]]:
         named_columns = {key.replace("_", "-"): value for key, value in named_columns.items()}
+        # TODO allow different cases
 
         # TODO Maybe allow *columns: Column to do this here:
         #   (doesn't work for models inside DB classes, as Column.name is populated later)
         #   named_columns.update({column.name.replace("_", "-"): column for column in columns})
 
-        def include_columns_inner(cls: Type[Model]) -> Type[Model]:
+        def include_columns_inner(cls: Type[t]) -> Type[t]:
             fields = {}
 
             class ModModel(cls):
                 __columns_converted__ = False
 
                 @classmethod
-                def convert_columns(cls):  # TODO find a better way
+                def convert_columns(cls):  # TODO find a better way, Nameable, perhaps?
                     if not cls.__columns_converted__:
+                        if hasattr(super(), "convert_columns"):
+                            super().convert_columns()  # noqa
                         named_columns.update({column.name.replace("_", "-"): column for column in columns})
                         for name, column in named_columns.items():
-                            fields.update(create_fields(column, name, __use_defaults__, __flatten_jsons__))
+                            fields.update(create_fields(column, name, _use_defaults, _flatten_jsons, name))
                         cls.__columns_converted__ = True
 
                 # TODO make model's ORM attributes usable (__init__?)
@@ -306,14 +320,22 @@ class Model:
                 def convert(cls: Type[t], orm_object, **context) -> t:
                     cls.convert_columns()
                     result: cls = super().convert(orm_object, **context)
-                    for column in named_columns.values():
-                        object.__setattr__(result, column.name, getattr(orm_object, column.name))
+                    for name, column in named_columns.items():
+                        object.__setattr__(result, name, getattr(orm_object, column.name or name.replace("-", "_")))
                     return result
 
                 @classmethod
                 def model(cls) -> dict[str, RawField]:
                     cls.convert_columns()
                     return dict(super().model(), **fields)
+
+                @classmethod
+                def deconvert(cls: Type[t], data: dict[str, ...]) -> t:
+                    cls.convert_columns()
+                    result: cls = super().deconvert(data)
+                    for name, column in named_columns.items():
+                        object.__setattr__(result, column.name, data[name])
+                    return result
 
                 @classmethod
                 def parser(cls, **kwargs) -> RequestParser:
@@ -329,9 +351,28 @@ class Model:
 
         return include_columns_inner
 
+    @classmethod
+    def named_column_model(cls: Type[t], _name: str, *columns: Column, **kwargs) -> Type[t]:
+        @cls.include_columns(*columns, **kwargs)
+        class ModModel(cls):
+            name = _name
+
+        return ModModel
+
+    @classmethod
+    def column_model(cls: Type[t], *columns: Column, **kwargs) -> Type[t]:
+        # only use as a property in a subclass of NamedProperties!
+        @cls.include_columns(*columns, **kwargs)
+        class ModModel(cls):
+            pass
+
+        return ModModel
+
+    # TODO include_relationship decorator & relationship_model metagenerator-classmethod
+
     @staticmethod
-    def include_model(model: Model) -> Callable[[Type[Model]], Type[Model]]:
-        def include_model_inner(cls: Type[Model]) -> Type[Model]:
+    def include_model(model: Type[Model]) -> Callable[[Type[t]], Type[t]]:
+        def include_model_inner(cls: Type[t]) -> Type[t]:
             class ModModel(cls, model):
                 pass
 
@@ -340,17 +381,17 @@ class Model:
         return include_model_inner
 
     @staticmethod
-    def include_context(*names, **var_types):  # TODO Maybe redo
+    def include_context(*names, **var_types) -> Callable[[Type[t]], Type[t]]:  # TODO Maybe redo
         var_types.update({name: object for name in names})
 
-        def include_context_inner(cls: Type[Model]) -> Type[Model]:
+        def include_context_inner(cls: Type[t]) -> Type[t]:
             class ModModel(cls):
                 @classmethod
                 def convert(cls: Type[t], orm_object, **context) -> t:
                     assert all((value := context.get(name, None)) is not None
                                and isinstance(value, var_type)
                                for name, var_type in var_types.items()), \
-                        "Context was not filled properly"
+                        "Context was not filled properly"  # TODO better error messages!
                     return super().convert(orm_object, **context)
 
             return ModModel
@@ -366,17 +407,23 @@ class Model:
         raise NotImplementedError()
 
     @classmethod
-    def parser(cls, **kwargs) -> RequestParser:
+    def deconvert(cls: Type[t], data: dict[str, ...]) -> t:
+        # TODO version of deconvert for parsing (see argument parser as well)
         raise NotImplementedError()
 
-    # TODO reverse of convert for parsing (see argument parser as well)
+    @classmethod
+    def parser(cls, **kwargs) -> RequestParser:
+        raise NotImplementedError()
 
 
 class PydanticModel(BaseModel, Model, ABC):
     @staticmethod
     def pydantic_to_restx_field(field: ModelField) -> RawField:
+        if isinstance(field.type_, ForwardRef):
+            raise NotImplementedError()
+
         if issubclass(field.type_, Model):
-            result = NestedField(flask_restx_has_bad_design.model(field.type_.model()))
+            result = NestedField(flask_restx_has_bad_design.model(field.type_.__qualname__, field.type_.model()))
         else:
             result = type_to_field[field.type_](**pydantic_field_to_kwargs(field))
 
@@ -387,7 +434,8 @@ class PydanticModel(BaseModel, Model, ABC):
 
     @classmethod
     def model(cls) -> dict[str, RawField]:
-        return {field.alias: PydanticModel.pydantic_to_restx_field(field) for name, field in cls.__fields__.items()}
+        return {field.alias.replace("_", "-"): PydanticModel.pydantic_to_restx_field(field)
+                for name, field in cls.__fields__.items()}
 
     @classmethod
     def parser(cls, **kwargs) -> RequestParser:
@@ -398,5 +446,28 @@ class PydanticModel(BaseModel, Model, ABC):
                 kwargs["action"] = "append"
             elif field.is_complex():
                 raise ValueError("Nested structures are not supported")  # TODO flat-nested fields support
-            parser.add_argument(field.alias, dest=name, type=field.type_, **pydantic_field_to_kwargs(field), **kwargs)
+            parser.add_argument(field.alias.replace("_", "-"), dest=name, type=field.type_,
+                                **pydantic_field_to_kwargs(field), **kwargs)
         return parser
+
+    @classmethod
+    def callback_convert(cls, callback: Callable, orm_object, **context) -> None:
+        pass
+
+    @classmethod
+    def dict_convert(cls, orm_object, **context) -> dict[str, ...]:
+        result = {}
+        cls.callback_convert(result.update, orm_object, **context)
+        return result
+
+    @classmethod
+    def convert(cls: Type[t], orm_object, **context) -> t:
+        return cls(**cls.dict_convert(orm_object, **context))
+
+    @classmethod
+    def parse_obj(cls: Type[t], obj: ...) -> t:
+        return cls.deconvert(obj)
+
+    @classmethod
+    def deconvert(cls: Type[t], data: dict[str, ...]) -> t:
+        return super().parse_obj(data)

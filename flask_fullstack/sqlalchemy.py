@@ -3,10 +3,13 @@ from __future__ import annotations
 from functools import wraps
 from typing import TypeVar, Type
 
+from flask_restx.fields import Raw as RawField
 from sqlalchemy import JSON, MetaData, select
 from sqlalchemy.engine import Row
-from sqlalchemy.orm import sessionmaker, declarative_base, Session as _Session
+from sqlalchemy.orm import sessionmaker, declarative_base, Session as _Session, DeclarativeMeta
 from sqlalchemy.sql import Select
+
+from .utils import Nameable, NamedPropertiesMeta
 
 
 class Session(_Session):
@@ -55,10 +58,11 @@ class Sessionmaker(sessionmaker):
 
 
 class JSONWithModel(JSON):
-    def __init__(self, model_name: str, model: dict, as_list: bool = False, none_as_null=False):
+    def __init__(self, model_name: str, model: dict | Type[RawField] | RawField,
+                 as_list: bool = False, none_as_null=False):
         super().__init__(none_as_null)
         self.model_name: str = model_name
-        self.model: dict = model
+        self.model: dict | Type[RawField] | RawField = model
         self.as_list: bool = as_list
 
 
@@ -71,6 +75,10 @@ class JSONWithSchema(JSON):
 
 
 t = TypeVar("t", bound="ModBase")
+
+
+class ModBaseMeta(NamedPropertiesMeta, DeclarativeMeta):
+    pass
 
 
 class ModBase:
@@ -111,7 +119,7 @@ class ModBase:
     def find_paginated_rows_by_kwargs(cls, session, offset: int, limit: int, *order_by, **kwargs) -> list[Row]:
         return session.get_paginated_rows(cls.select_by_kwargs(*order_by, **kwargs), offset, limit)
 
-    # TODO find_by_... with reflection
+    # TODO find_by_... with reflection or metaclasses
 
     def delete(self, session: Session) -> None:
         session.delete(self)
@@ -119,4 +127,5 @@ class ModBase:
 
 
 def create_base(meta: MetaData) -> Type[ModBase]:
-    return declarative_base(metadata=meta, cls=ModBase)
+    # noinspection PyTypeChecker
+    return declarative_base(metadata=meta, cls=ModBase, metaclass=ModBaseMeta)

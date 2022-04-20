@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from functools import wraps
-from typing import Union
+from typing import Union, Type, Sequence
 
 from flask_restx import Namespace, Model as BaseModel, abort as default_abort
-from flask_restx.fields import List as ListField, Boolean as BoolField, Nested
+from flask_restx.fields import List as ListField, Boolean as BoolField, Integer as IntegerField, Nested
 from flask_restx.marshalling import marshal
 from flask_restx.reqparse import RequestParser
 
@@ -81,12 +81,15 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
         return doc_responses_wrapper
 
-    def marshal_with(self, fields: BaseModel | Model, **kwargs):
-        result = super().marshal_with(fields, **kwargs)
-        if isinstance(fields, Model):
+    def marshal_with(self, fields: BaseModel | Type[Model], *args, **kwargs):
+        result = super().marshal_with
+
+        if isinstance(fields, type) and issubclass(fields, Model):
+            model = self.models.get(fields.name, None) or self.model(model=fields)
+
             def marshal_with_wrapper(function: Callable) -> Callable[..., Model]:
                 @wraps(function)
-                @result
+                @result(model, *args, **kwargs)
                 def marshal_with_inner(*args, **kwargs):
                     return fields.convert(function(*args, **kwargs), **kwargs)
 
@@ -94,9 +97,19 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
             return marshal_with_wrapper
 
-        return result
+        return result(fields, *args, **kwargs)
 
-    def lister(self, per_request: int, marshal_model: BaseModel | Model, skip_none: bool = True):
+    def marshal(self, data, fields: Type[Model] | ..., *args, **kwargs):
+        if isinstance(fields, type) and issubclass(fields, Model):
+            if isinstance(data, Sequence):
+                data = [fields.convert(d) for d in data]
+            else:
+                data = fields.convert(data)
+            fields = self.models.get(fields.name, None) or self.model(model=fields)
+        return marshal(data, fields, *args, **kwargs)
+
+    def lister(self, per_request: int, marshal_model: BaseModel | Type[Model], skip_none: bool = True,
+               count_all: Callable[..., int] | None = None, provided_total: bool = False):
         """
         - Used for organising pagination.
         - Uses `counter` form incoming arguments for the decorated function and `per_request` argument
@@ -107,16 +120,20 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
         :param per_request:
         :param marshal_model:
         :param skip_none:
+        :param count_all:
+        :param provided_total:
         :return:
         """
-        if isinstance(marshal_model, Model):
-            model = marshal_model.model()
-            name = marshal_model.__name__
-        else:
-            model = marshal_model
+        if isinstance(marshal_model, type) and issubclass(marshal_model, Model):
             name = marshal_model.name
+            model = self.models.get(name, None) or self.model(model=marshal_model)
+        else:
+            name = marshal_model.name
+            model = marshal_model
 
         response = {"results": ListField(Nested(model), max_items=per_request), "has-next": BoolField}
+        if count_all is not None or provided_total:
+            response["total"] = IntegerField
         response = BaseModel(f"List" + name, response)
         response = ResponseDoc(200, f"Max size of results: {per_request}", response)
 
@@ -134,13 +151,21 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
                 kwargs["start"] = offset
                 kwargs["finish"] = offset + per_request + 1
                 result_list = function(*args, **kwargs)
+                if provided_total:
+                    total = result_list[1]
+                    result_list = result_list[0]
 
                 if has_next := len(result_list) > per_request:
                     result_list.pop()
 
-                if isinstance(marshal_model, Model):
-                    result_list = [marshal_model.convert(result) for result in result_list]
-                return {"results": marshal(result_list, model, skip_none=skip_none), "has-next": has_next}
+                if isinstance(marshal_model, type) and issubclass(marshal_model, Model):
+                    result_list = [marshal_model.convert(result, **kwargs) for result in result_list]
+                result = {"results": marshal(result_list, model, skip_none=skip_none), "has-next": has_next}
+                if count_all is not None:
+                    result["total"] = count_all(*args, **kwargs)
+                if provided_total:
+                    result["total"] = total
+                return result
 
             return lister_inner
 
@@ -148,8 +173,8 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
     def model(self, name: str = None, model=None, **kwargs):
         # TODO recursive registration
-        # TODO name as a class attribute of Model
-        # TODO auto-registration in marshal_with & lister
-        if isinstance(model, Model):
-            return super().model(name or Model.__name__, model.model(), **kwargs)
+        if isinstance(model, type) and issubclass(model, Model):
+            if model.name is None:
+                model.name = name or model.__qualname__
+            return super().model(name or model.name, model.model(), **kwargs)
         return super().model(name, model, **kwargs)
