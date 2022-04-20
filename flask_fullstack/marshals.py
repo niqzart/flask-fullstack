@@ -321,7 +321,7 @@ class Model(Nameable):
                     cls.convert_columns()
                     result: cls = super().convert(orm_object, **context)
                     for name, column in named_columns.items():
-                        object.__setattr__(result, name, getattr(orm_object, column.name))
+                        object.__setattr__(result, name, getattr(orm_object, column.name or name.replace("-", "_")))
                     return result
 
                 @classmethod
