@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 from collections import OrderedDict
 from collections.abc import Callable
-from typing import Type
+from dataclasses import dataclass
+from typing import Type, Iterable
 
 from flask_socketio import Namespace as _Namespace, SocketIO as _SocketIO
 from pydantic import BaseModel
@@ -13,57 +16,88 @@ def kebabify_model(model: Type[BaseModel]):
         field.alias = field.name.replace("_", "-")
 
 
+@dataclass
+class BoundEvent:
+    event: BaseEvent
+    model: Type[BaseModel]
+    function: Callable = None
+    additional_docs: dict = None
+
+    def handler(self, data=None):
+        return self.function(**self.model.parse_obj(data).dict())
+
+    def create_doc(self, namespace: str = None):
+        return self.event.create_doc(namespace or "/", self.additional_docs)
+
+
 class EventGroup:
     def __init__(self, use_kebab_case: bool = False):
         self.use_kebab_case: bool = use_kebab_case
-        self.doc_channels = OrderedDict()
-        self.doc_messages = OrderedDict()
-        self.handlers = {}
+        self.bound_events: list[BoundEvent] = []
 
     @staticmethod
-    def _kebabify(name: str, model: Type[BaseModel]) -> str:
+    def _kebabify(name: str | None, model: Type[BaseModel]) -> str | None:
         kebabify_model(model)
+        if name is None:
+            return None
         return name.replace("_", "-")
 
-    def _doc_event(self, event: BaseEvent, model: Type[BaseModel], additional_docs: dict = None):
-        self.doc_channels[event.name] = event.create_doc("/", additional_docs)
-        self.doc_messages[model.__name__] = {"payload": model.schema()}
-        # {"name": "", "title": "", "summary": "", "description": ""}
+    def _get_model_name(self, bound_event: BoundEvent):  # TODO use .name in ffs
+        return bound_event.model.__qualname__
 
-    def _add_handler(self, name: str, model: Type[BaseModel], function: Callable):
-        self.handlers[name] = lambda data=None: function(**model.parse_obj(data).dict())
+    def extract_doc_channels(self, namespace: str = None) -> OrderedDict[str, ...]:
+        return OrderedDict((bound_event.event.name, bound_event.create_doc(namespace))
+                           for bound_event in self.bound_events)
 
-    def bind_pub(self, name: str, description: str, model: Type[BaseModel]) -> Callable[[Callable], ClientEvent]:
+    def extract_doc_messages(self) -> OrderedDict[str, ...]:
+        return OrderedDict((self._get_model_name(bound_event), {"payload": bound_event.model.schema()})
+                           for bound_event in self.bound_events)
+
+    def extract_handlers(self) -> Iterable[tuple[str, Callable]]:
+        for bound_event in self.bound_events:
+            yield bound_event.event.name, bound_event.handler
+
+    def bind_pub(self, model: Type[BaseModel], name: str, description: str) -> Callable[[Callable], ClientEvent]:
         if self.use_kebab_case:
             name = self._kebabify(name, model)
         event = ClientEvent(model, name, description)
 
         def bind_pub_wrapper(function) -> ClientEvent:
-            self._add_handler(name, model, function)
-            self._doc_event(event, model, getattr(function, "__sio_doc__", None))
+            self.bound_events.append(BoundEvent(event, model, function, getattr(function, "__sio_doc__", None)))
             return event
 
         return bind_pub_wrapper
 
-    def bind_sub(self, name: str, description: str, model: Type[BaseModel]) -> ServerEvent:
+    def bind_sub(self, model: Type[BaseModel], name: str, description: str) -> ServerEvent:
         if self.use_kebab_case:
             name = self._kebabify(name, model)
         event = ServerEvent(model, name, description)
-        self._doc_event(event, model)
+        self.bound_events.append(BoundEvent(event, model))
         return event
 
-    def bind_dup(self, name: str, description: str, model: Type[BaseModel]) -> Callable[[Callable], DuplexEvent]:
+    def bind_dup(self, model: Type[BaseModel], name: str, description: str) -> Callable[[Callable], DuplexEvent]:
         if self.use_kebab_case:
             name = self._kebabify(name, model)
         event = DuplexEvent.similar(model, name)
         event.description = description
 
         def bind_dup_wrapper(function) -> DuplexEvent:
-            self._add_handler(name, model, function)
-            self._doc_event(event, model, getattr(function, "__sio_doc__", None))
+            self.bound_events.append(BoundEvent(event, model, function, getattr(function, "__sio_doc__", None)))
             return event
 
         return bind_dup_wrapper
+
+
+class EventSpaceMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, ...]):
+        for name, value in namespace.items():
+            if isinstance(value, BaseEvent) and value.name is None:
+                value.attach_name(name)
+        super().__init__(name, bases, namespace)
+
+
+class EventSpace(metaclass=EventSpaceMeta):
+    pass
 
 
 class Namespace(_Namespace):
@@ -73,9 +107,9 @@ class Namespace(_Namespace):
         self.doc_messages = OrderedDict()
 
     def attach_event_group(self, event_group: EventGroup):
-        self.doc_channels.update(event_group.doc_channels)
-        self.doc_messages.update(event_group.doc_messages)
-        for name, handler in event_group.handlers.items():
+        self.doc_channels.update(event_group.extract_doc_channels())
+        self.doc_messages.update(event_group.extract_doc_messages())
+        for name, handler in event_group.extract_handlers():
             setattr(self, f"on_{name.replace('-', '_')}", handler)
 
 
