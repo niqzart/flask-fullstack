@@ -125,7 +125,7 @@ def create_fields(column: Column, name: str, use_defaults: bool = False, flatten
                   required: bool = None, attribute: str = None) -> dict[str, ...]:
     if not use_defaults or column.default is None or column.nullable or isinstance(column.default, Sequence):
         default = None
-        required = required or column.nullable
+        required = required or not column.nullable
     else:
         default = column.default.arg
         required = required or False
@@ -294,7 +294,7 @@ class Model(Nameable):
 
     @staticmethod
     def include_columns(*columns: Column, _use_defaults: bool = False, _flatten_jsons: bool = False,
-                        _require_all: bool = True, **named_columns: Column) -> Callable[[Type[t]], Type[t]]:
+                        _require_all: bool = None, **named_columns: Column) -> Callable[[Type[t]], Type[t]]:
         named_columns = {key.replace("_", "-"): value for key, value in named_columns.items()}
 
         # TODO allow different cases
