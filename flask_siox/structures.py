@@ -42,7 +42,7 @@ class EventGroup:
             return None
         return name.replace("_", "-")
 
-    def _get_model_name(self, bound_event: BoundEvent):  # TODO use .name in ffs
+    def _get_model_name(self, bound_event: BoundEvent):
         return bound_event.model.__qualname__
 
     def extract_doc_channels(self, namespace: str = None) -> OrderedDict[str, ...]:
