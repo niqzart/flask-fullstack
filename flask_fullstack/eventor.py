@@ -4,6 +4,7 @@ from typing import Union
 
 from flask_socketio import disconnect
 
+from .marshals import PydanticModel
 from .mixins import DatabaseSearcherMixin, JWTAuthorizerMixin
 from .sqlalchemy import Sessionmaker
 from .utils import Nameable
@@ -30,10 +31,12 @@ class EventGroup(BaseEventGroup, metaclass=ABCMeta):
     def with_begin(self, function):
         return self.sessionmaker.with_begin(function)
 
-    def _get_model_name(self, bound_event: BoundEvent):
+    def _bind_event(self, bound_event: BoundEvent):
         if issubclass(bound_event.model, Nameable):
-            return bound_event.model.name
-        return super()._get_model_name(bound_event)
+            bound_event.event.attach_model_name(bound_event.model.name)
+        if issubclass(bound_event.model, PydanticModel):
+            bound_event.model.Config.title = bound_event.model.name
+        self.bound_events.append(bound_event)
 
     def abort(self, error_code: Union[int, str], description: str, *, critical: bool = False, **kwargs):
         raise EventException(error_code, description, critical)

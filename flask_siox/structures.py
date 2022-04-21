@@ -8,7 +8,7 @@ from typing import Type, Iterable
 from flask_socketio import Namespace as _Namespace, SocketIO as _SocketIO
 from pydantic import BaseModel
 
-from .events import ClientEvent, ServerEvent, DuplexEvent, BaseEvent
+from .events import ClientEvent, ServerEvent, DuplexEvent, BaseEvent, Event
 
 
 def kebabify_model(model: Type[BaseModel]):
@@ -26,9 +26,6 @@ class BoundEvent:
     def handler(self, data=None):
         return self.function(**self.model.parse_obj(data).dict())
 
-    def create_doc(self, namespace: str = None):
-        return self.event.create_doc(namespace or "/", self.additional_docs)
-
 
 class EventGroup:
     def __init__(self, use_kebab_case: bool = False):
@@ -42,20 +39,41 @@ class EventGroup:
             return None
         return name.replace("_", "-")
 
-    def _get_model_name(self, bound_event: BoundEvent):
-        return bound_event.model.__qualname__
+    @staticmethod
+    def _get_model_name(bound_event: BoundEvent):
+        if isinstance(bound_event.event, Event):
+            return bound_event.event.model_name or bound_event.model.__name__
+        if isinstance(bound_event.event, DuplexEvent):
+            return bound_event.event.client_event.model_name or bound_event.model.__name__  # TODO make it beautiful
+        return bound_event.model.__name__
+
+    @staticmethod
+    def _get_model_reference(bound_event: BoundEvent, namespace: str = None):
+        return bound_event.event.create_doc(namespace or "/", bound_event.additional_docs)
+
+    @staticmethod
+    def _get_model_schema(bound_event: BoundEvent):
+        return {"payload": bound_event.model.schema()}
+
+    def _get_event_name(self, bound_event: BoundEvent):
+        if self.use_kebab_case:
+            return bound_event.event.name.replace("_", "-")
+        return bound_event.event.name
 
     def extract_doc_channels(self, namespace: str = None) -> OrderedDict[str, ...]:
-        return OrderedDict((bound_event.event.name, bound_event.create_doc(namespace))
+        return OrderedDict((self._get_event_name(bound_event), self._get_model_reference(bound_event, namespace))
                            for bound_event in self.bound_events)
 
     def extract_doc_messages(self) -> OrderedDict[str, ...]:
-        return OrderedDict((self._get_model_name(bound_event), {"payload": bound_event.model.schema()})
+        return OrderedDict((self._get_model_name(bound_event), self._get_model_schema(bound_event))
                            for bound_event in self.bound_events)
 
     def extract_handlers(self) -> Iterable[tuple[str, Callable]]:
         for bound_event in self.bound_events:
             yield bound_event.event.name, bound_event.handler
+
+    def _bind_event(self, bound_event: BoundEvent):
+        self.bound_events.append(bound_event)
 
     def bind_pub(self, model: Type[BaseModel], *, description: str = None,
                  name: str = None) -> Callable[[Callable], ClientEvent]:
@@ -64,7 +82,7 @@ class EventGroup:
         event = ClientEvent(model, name, description)
 
         def bind_pub_wrapper(function) -> ClientEvent:
-            self.bound_events.append(BoundEvent(event, model, function, getattr(function, "__sio_doc__", None)))
+            self._bind_event(BoundEvent(event, model, function, getattr(function, "__sio_doc__", None)))
             return event
 
         return bind_pub_wrapper
@@ -73,7 +91,7 @@ class EventGroup:
         if self.use_kebab_case:
             name = self._kebabify(name, model)
         event = ServerEvent(model, name, description)
-        self.bound_events.append(BoundEvent(event, model))
+        self._bind_event(BoundEvent(event, model))
         return event
 
     def bind_dup(self, model: Type[BaseModel], *, description: str = None,
@@ -84,7 +102,7 @@ class EventGroup:
         event.description = description
 
         def bind_dup_wrapper(function) -> DuplexEvent:
-            self.bound_events.append(BoundEvent(event, model, function, getattr(function, "__sio_doc__", None)))
+            self._bind_event(BoundEvent(event, model, function, getattr(function, "__sio_doc__", None)))
             return event
 
         return bind_dup_wrapper
