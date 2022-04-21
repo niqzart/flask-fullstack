@@ -375,6 +375,48 @@ class Model(Nameable):
 
         return ModModel
 
+    @staticmethod
+    def include_nest_model(model: Type[Model], field_name: str, parameter_name: str = None,
+                           as_list: bool = False) -> Callable[[Type[t]], Type[t]]:
+        if parameter_name is None:
+            parameter_name = field_name
+
+        def include_nest_model_inner(cls: Type[t]) -> Type[t]:
+            class ModModel(cls):
+                @classmethod
+                def convert(cls: Type[t], orm_object, **context) -> t:
+                    result: cls = super().convert(orm_object, **context)
+                    object.__setattr__(result, field_name, getattr(orm_object, parameter_name))
+                    return result
+
+                @classmethod
+                def model(cls) -> dict[str, RawField]:  # TODO workaround, replace with recursive registration
+                    return dict(super().model(), **{field_name: NestedField(
+                        flask_restx_has_bad_design.model(name=model.name, model=model.model()), as_list=as_list)})
+
+                @classmethod
+                def deconvert(cls: Type[t], data: dict[str, ...]) -> t:
+                    result: cls = super().deconvert(data)
+                    object.__setattr__(result, parameter_name, data[field_name])
+                    return result
+
+                @classmethod
+                def parser(cls, **kwargs) -> RequestParser:
+                    raise ValueError("Nested structures are not supported")
+
+            return ModModel
+
+        return include_nest_model_inner
+
+    @classmethod
+    def nest_model(cls, model: Type[Model], field_name: str, parameter_name: str = None,
+                   as_list: bool = False) -> Type[t]:
+        @cls.include_nest_model(model, field_name, parameter_name, as_list)
+        class ModModel(cls):
+            pass
+
+        return ModModel
+
     # TODO include_relationship decorator & relationship_model metagenerator-classmethod
 
     @staticmethod
@@ -386,6 +428,14 @@ class Model(Nameable):
             return ModModel
 
         return include_model_inner
+
+    @classmethod
+    def combine_with(cls, model: Type[Model]) -> Type[t]:
+        # only use as a property in a subclass of NamedProperties!
+        class ModModel(cls, model):
+            pass
+
+        return ModModel
 
     @staticmethod
     def include_context(*names, **var_types) -> Callable[[Type[t]], Type[t]]:  # TODO Maybe redo
