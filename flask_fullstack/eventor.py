@@ -2,9 +2,10 @@ from abc import ABCMeta
 from dataclasses import dataclass
 from typing import Union
 
+from flask_restx import Model as BaseModel
 from flask_socketio import disconnect
 
-from .marshals import PydanticModel
+from .marshals import PydanticModel, Model
 from .mixins import DatabaseSearcherMixin, JWTAuthorizerMixin
 from .sqlalchemy import Sessionmaker
 from .utils import Nameable
@@ -37,6 +38,12 @@ class EventGroup(BaseEventGroup, metaclass=ABCMeta):
         if issubclass(bound_event.model, PydanticModel):
             bound_event.model.Config.title = bound_event.model.name
         self.bound_events.append(bound_event)
+
+    @staticmethod
+    def _get_model_schema(bound_event: BoundEvent):
+        if issubclass(bound_event.model, Model):  # TODO required is not in the docs somehow
+            return {"payload": BaseModel(EventGroup._get_model_name(bound_event), bound_event.model.model()).__schema__}
+        return {"payload": bound_event.model.schema()}
 
     def abort(self, error_code: Union[int, str], description: str, *, critical: bool = False, **kwargs):
         raise EventException(error_code, description, critical)
