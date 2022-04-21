@@ -3,12 +3,12 @@ from __future__ import annotations
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Type, Iterable, Any
+from typing import Type, Iterable
 
 from flask_socketio import Namespace as _Namespace, SocketIO as _SocketIO
 from pydantic import BaseModel
 
-from .events import ClientEvent, ServerEvent, DuplexEvent, BaseEvent, Event
+from .events import ClientEvent, ServerEvent, DuplexEvent, BaseEvent
 
 
 def kebabify_model(model: Type[BaseModel]):
@@ -20,11 +20,8 @@ def kebabify_model(model: Type[BaseModel]):
 class BoundEvent:
     event: BaseEvent
     model: Type[BaseModel]
-    function: Callable = None
+    handler: Callable = None
     additional_docs: dict = None
-
-    def handler(self, data=None):
-        return self.function(**self.model.parse_obj(data).dict())
 
 
 class EventGroup:
@@ -83,7 +80,10 @@ class EventGroup:
         self._bind_model(model)
 
         def bind_pub_wrapper(function) -> ClientEvent:
-            self._bind_event(BoundEvent(event, model, function, getattr(function, "__sio_doc__", None)))
+            def handler(data=None):
+                return function(**model.parse_obj(data).dict())
+
+            self._bind_event(BoundEvent(event, model, handler, getattr(function, "__sio_doc__", None)))
             return event
 
         return bind_pub_wrapper
@@ -96,8 +96,8 @@ class EventGroup:
         self._bind_model(model)
         return event
 
-    def bind_dup(self, model: Type[BaseModel], server_model: Type[BaseModel] = None, *,
-                 description: str = None, name: str = None) -> Callable[[Callable], DuplexEvent]:
+    def bind_dup(self, model: Type[BaseModel], server_model: Type[BaseModel] = None, *, description: str = None,
+                 name: str = None, echo: bool = False, use_event: bool = False) -> Callable[[Callable], DuplexEvent]:
         if self.use_kebab_case:
             name = self._kebabify(name, model)
 
@@ -110,7 +110,15 @@ class EventGroup:
         self._bind_model(model)
 
         def bind_dup_wrapper(function) -> DuplexEvent:
-            self._bind_event(BoundEvent(event, model, function, getattr(function, "__sio_doc__", None)))
+            def handler(data=None):
+                args = []
+                if use_event:
+                    args.append(event)
+                result = function(*args, **model.parse_obj(data).dict())
+                if echo:
+                    event.emit(*result)
+
+            self._bind_event(BoundEvent(event, model, handler, getattr(function, "__sio_doc__", None)))
             return event
 
         return bind_dup_wrapper
