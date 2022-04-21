@@ -19,7 +19,7 @@ class AbstractAbortMixin:
         def doc_aborts_wrapper(function):
             for response in responses:
                 function = self.doc_abort(
-                    response[0], response[1], critical=response[2] if len(response) == 2 else False)(function)
+                    response[0], response[1], critical=response[2] if len(response) == 3 else False)(function)
             return function
 
         return doc_aborts_wrapper

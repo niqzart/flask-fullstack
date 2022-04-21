@@ -283,6 +283,7 @@ class ResponseDoc:
 
 
 t = TypeVar("t", bound="Model")
+Undefined = object()
 
 
 class Model(Nameable):
@@ -338,7 +339,9 @@ class Model(Nameable):
                     cls.convert_columns()
                     result: cls = super().deconvert(data)
                     for name, column in named_columns.items():
-                        object.__setattr__(result, column.name, data[name])
+                        value = data.get(name, Undefined)
+                        if value is not Undefined:
+                            object.__setattr__(result, column.name, value)
                     return result
 
                 @classmethod
