@@ -121,12 +121,14 @@ def move_field_attribute(root_name: str, field_name: str, field_def: Type[RawFie
     return field_def
 
 
-def create_fields(column: Column, name: str, use_defaults: bool = False,
-                  flatten_jsons: bool = False, attribute: str = None) -> dict[str, ...]:
+def create_fields(column: Column, name: str, use_defaults: bool = False, flatten_jsons: bool = False,
+                  required: bool = None, attribute: str = None) -> dict[str, ...]:
     if not use_defaults or column.default is None or column.nullable or isinstance(column.default, Sequence):
         default = None
+        required = required or column.nullable
     else:
         default = column.default.arg
+        required = required or False
 
     for supported_type, field_type in column_to_field.items():
         if isinstance(column.type, supported_type):
@@ -134,6 +136,7 @@ def create_fields(column: Column, name: str, use_defaults: bool = False,
     else:
         return {}
 
+    kwargs = {"attribute": attribute or column.name, "default": default, "required": required}
     if issubclass(field_type, JSONWithModelField):
         json_type: JSONWithModel = column.type
 
@@ -143,12 +146,12 @@ def create_fields(column: Column, name: str, use_defaults: bool = False,
 
         field = json_type.model
         if isinstance(json_type.model, dict):
-            field = NestedField(flask_restx_has_bad_design.model(json_type.model_name, field))
+            field = NestedField(flask_restx_has_bad_design.model(json_type.model_name, field),
+                                **({} if column.type.as_list else kwargs))
         if column.type.as_list:
-            field = ListField(field)
+            field = ListField(field, **kwargs)
         # field: RawField = field_type.create(column, column_type, default)
     else:
-        kwargs = {"attribute": attribute or column.name, "default": default}
         if field_type == EnumField:
             enum = column.type.enum_class
             if isinstance(enum, type) and issubclass(enum, TypeEnum):
@@ -290,7 +293,7 @@ class Model(Nameable):
 
     @staticmethod
     def include_columns(*columns: Column, _use_defaults: bool = False, _flatten_jsons: bool = False,
-                        **named_columns: Column) -> Callable[[Type[t]], Type[t]]:
+                        _require_all: bool = True, **named_columns: Column) -> Callable[[Type[t]], Type[t]]:
         named_columns = {key.replace("_", "-"): value for key, value in named_columns.items()}
         # TODO allow different cases
 
@@ -311,7 +314,8 @@ class Model(Nameable):
                             super().convert_columns()  # noqa
                         named_columns.update({column.name.replace("_", "-"): column for column in columns})
                         for name, column in named_columns.items():
-                            fields.update(create_fields(column, name, _use_defaults, _flatten_jsons, name))
+                            fields.update(
+                                create_fields(column, name, _use_defaults, _flatten_jsons, _require_all, name))
                         cls.__columns_converted__ = True
 
                 # TODO make model's ORM attributes usable (__init__?)
@@ -423,12 +427,13 @@ class PydanticModel(BaseModel, Model, ABC):
             raise NotImplementedError()
 
         if issubclass(field.type_, Model):
-            result = NestedField(flask_restx_has_bad_design.model(field.type_.__qualname__, field.type_.model()))
+            result = NestedField(flask_restx_has_bad_design.model(field.type_.__qualname__, field.type_.model()),
+                                 **pydantic_field_to_kwargs(field))
         else:
             result = type_to_field[field.type_](**pydantic_field_to_kwargs(field))
 
         if field.type_ is not field.outer_type_:
-            result = ListField(result)
+            result = ListField(result, **pydantic_field_to_kwargs(field))
         result.attribute = field.name
         return result
 

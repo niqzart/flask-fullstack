@@ -41,7 +41,7 @@ class EventGroup(BaseEventGroup, metaclass=ABCMeta):
 
     @staticmethod
     def _get_model_schema(bound_event: BoundEvent):
-        if issubclass(bound_event.model, Model):  # TODO required is not in the docs somehow
+        if issubclass(bound_event.model, Model):
             return {"payload": BaseModel(EventGroup._get_model_name(bound_event), bound_event.model.model()).__schema__}
         return {"payload": bound_event.model.schema()}
 
