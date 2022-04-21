@@ -11,7 +11,6 @@ from .mixins import DatabaseSearcherMixin, JWTAuthorizerMixin
 from .sqlalchemy import Sessionmaker
 from .utils import Nameable
 from ..flask_siox import Namespace as _Namespace, EventGroup as _EventGroup
-from ..flask_siox.structures import BoundEvent
 
 
 class BaseEventGroup(_EventGroup, DatabaseSearcherMixin, JWTAuthorizerMixin, metaclass=ABCMeta):
