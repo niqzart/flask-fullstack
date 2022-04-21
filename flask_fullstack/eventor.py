@@ -1,12 +1,17 @@
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Union
+from typing import Union, Type
 
+from flask_restx import Model
 from flask_socketio import disconnect
+from pydantic import BaseModel
 
+from .marshals import PydanticModel
 from .mixins import DatabaseSearcherMixin, JWTAuthorizerMixin
 from .sqlalchemy import Sessionmaker
+from .utils import Nameable
 from ..flask_siox import Namespace as _Namespace, EventGroup as _EventGroup
+from ..flask_siox.structures import BoundEvent
 
 
 class BaseEventGroup(_EventGroup, DatabaseSearcherMixin, JWTAuthorizerMixin, metaclass=ABCMeta):
@@ -27,6 +32,23 @@ class EventGroup(BaseEventGroup, metaclass=ABCMeta):
 
     def with_begin(self, function):
         return self.sessionmaker.with_begin(function)
+
+    def _bind_model(self, bound_model: Type[BaseModel]):
+        if issubclass(bound_model, PydanticModel):
+            bound_model.Config.title = bound_model.name
+        super()._bind_model(bound_model)
+
+    @staticmethod
+    def _get_model_name(bound_model: Type[BaseModel]):
+        if isinstance(bound_model, type) and issubclass(bound_model, Nameable):
+            return bound_model.name or bound_model.__name__
+        return bound_model.__name__
+
+    @staticmethod
+    def _get_model_schema(bound_model: Type[BaseModel]):
+        if issubclass(bound_model, PydanticModel):
+            return {"payload": Model(EventGroup._get_model_name(bound_model), bound_model.model()).__schema__}
+        return {"payload": bound_model.schema()}
 
     def abort(self, error_code: Union[int, str], description: str, *, critical: bool = False, **kwargs):
         raise EventException(error_code, description, critical)

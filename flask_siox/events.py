@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections import Callable
 from dataclasses import dataclass
 from typing import Type
@@ -31,10 +33,11 @@ class Event(BaseEvent):  # do not instantiate!
         self.name = name
 
     def create_doc(self, namespace: str, additional_docs: dict = None):
+        model_name: str = getattr(self.model, "name", None) or self.model.__name__
         return remove_none({
             "description": self.description,
             "tags": [{"name": f"namespace-{namespace}"}],
-            "message": {"$ref": f"#/components/messages/{self.model.__name__}"}
+            "message": {"$ref": f"#/components/messages/{model_name}"}
         }, **(additional_docs or {}))
 
 
