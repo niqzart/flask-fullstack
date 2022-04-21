@@ -10,7 +10,7 @@ from .marshals import PydanticModel
 from .mixins import DatabaseSearcherMixin, JWTAuthorizerMixin
 from .sqlalchemy import Sessionmaker
 from .utils import Nameable
-from ..flask_siox import Namespace as _Namespace, EventGroup as _EventGroup
+from ..flask_siox import Namespace as _Namespace, EventGroup as _EventGroup, ServerEvent as _ServerEvent
 
 
 class BaseEventGroup(_EventGroup, DatabaseSearcherMixin, JWTAuthorizerMixin, metaclass=ABCMeta):
@@ -24,7 +24,16 @@ class EventException(Exception):
     critical: bool = False
 
 
+class ServerEvent(_ServerEvent):
+    def emit(self, _room: str = None, _include_self: bool = True, _data: ... = None, **kwargs):
+        if issubclass(self.model, PydanticModel) and _data is not None:
+            _data = self.model.convert(_data)
+        return super().emit(_room, _include_self, _data, **kwargs)
+
+
 class EventGroup(BaseEventGroup, metaclass=ABCMeta):
+    ServerEvent = ServerEvent
+
     def __init__(self, sessionmaker: Sessionmaker, use_kebab_case: bool = False):
         super().__init__(use_kebab_case)
         self.sessionmaker = sessionmaker

@@ -25,6 +25,10 @@ class BoundEvent:
 
 
 class EventGroup:
+    ClientEvent = ClientEvent
+    ServerEvent = ServerEvent
+    DuplexEvent = DuplexEvent
+
     def __init__(self, use_kebab_case: bool = False):
         self.use_kebab_case: bool = use_kebab_case
         self.bound_events: list[BoundEvent] = []
@@ -76,7 +80,7 @@ class EventGroup:
                  name: str = None) -> Callable[[Callable], ClientEvent]:
         if self.use_kebab_case:
             name = self._kebabify(name, model)
-        event = ClientEvent(model, name, description)
+        event = self.ClientEvent(model, name, description)
         self._bind_model(model)
 
         def bind_pub_wrapper(function) -> ClientEvent:
@@ -91,7 +95,7 @@ class EventGroup:
     def bind_sub(self, model: Type[BaseModel], *, description: str = None, name: str = None) -> ServerEvent:
         if self.use_kebab_case:
             name = self._kebabify(name, model)
-        event = ServerEvent(model, name, description)
+        event = self.ServerEvent(model, name, description)
         self._bind_event(BoundEvent(event, model))
         self._bind_model(model)
         return event
@@ -102,16 +106,20 @@ class EventGroup:
             name = self._kebabify(name, model)
 
         if server_model is None:
-            event = DuplexEvent.similar(model, name)
+            server_model = model
         else:
-            event = DuplexEvent(ClientEvent(model, name, description), ServerEvent(server_model, name, description))
             self._bind_model(server_model)
-        event.description = description
+
+        event = self.DuplexEvent(
+            self.ClientEvent(model, name, description),
+            self.ServerEvent(server_model, name, description),
+            description=description)
         self._bind_model(model)
 
         def bind_dup_wrapper(function) -> DuplexEvent:
-            def handler(data=None):
-                args = []
+            def handler(*args):
+                data = args[-1]
+                args = list(args)
                 if use_event:
                     args.append(event)
                 result = function(*args, **model.parse_obj(data).dict())
@@ -128,7 +136,7 @@ class EventSpaceMeta(type):
     def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, ...]):
         for name, value in namespace.items():
             if isinstance(value, BaseEvent) and value.name is None:
-                value.attach_name(name)
+                value.attach_name(name.replace("_", "-"))
         super().__init__(name, bases, namespace)
 
 
