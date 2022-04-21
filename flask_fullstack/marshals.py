@@ -296,6 +296,7 @@ class Model(Nameable):
     def include_columns(*columns: Column, _use_defaults: bool = False, _flatten_jsons: bool = False,
                         _require_all: bool = True, **named_columns: Column) -> Callable[[Type[t]], Type[t]]:
         named_columns = {key.replace("_", "-"): value for key, value in named_columns.items()}
+
         # TODO allow different cases
 
         # TODO Maybe allow *columns: Column to do this here:
@@ -377,7 +378,7 @@ class Model(Nameable):
 
     @staticmethod
     def include_nest_model(model: Type[Model], field_name: str, parameter_name: str = None,
-                           as_list: bool = False) -> Callable[[Type[t]], Type[t]]:
+                           as_list: bool = False, required: bool = True) -> Callable[[Type[t]], Type[t]]:
         if parameter_name is None:
             parameter_name = field_name
 
@@ -392,7 +393,8 @@ class Model(Nameable):
                 @classmethod
                 def model(cls) -> dict[str, RawField]:  # TODO workaround, replace with recursive registration
                     return dict(super().model(), **{field_name: NestedField(
-                        flask_restx_has_bad_design.model(name=model.name, model=model.model()), as_list=as_list)})
+                        flask_restx_has_bad_design.model(name=model.name, model=model.model()),
+                        required=required, as_list=as_list)})
 
                 @classmethod
                 def deconvert(cls: Type[t], data: dict[str, ...]) -> t:
