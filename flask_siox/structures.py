@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Type, Iterable
+from typing import Type, Iterable, Any
 
 from flask_socketio import Namespace as _Namespace, SocketIO as _SocketIO
 from pydantic import BaseModel
@@ -31,6 +31,7 @@ class EventGroup:
     def __init__(self, use_kebab_case: bool = False):
         self.use_kebab_case: bool = use_kebab_case
         self.bound_events: list[BoundEvent] = []
+        self.bound_models: list[Type[BaseModel]] = []
 
     @staticmethod
     def _kebabify(name: str | None, model: Type[BaseModel]) -> str | None:
@@ -39,34 +40,30 @@ class EventGroup:
             return None
         return name.replace("_", "-")
 
-    @staticmethod
-    def _get_model_name(bound_event: BoundEvent):
-        if isinstance(bound_event.event, Event):
-            return bound_event.event.model_name or bound_event.model.__name__
-        if isinstance(bound_event.event, DuplexEvent):
-            return bound_event.event.client_event.model_name or bound_event.model.__name__  # TODO make it beautiful
-        return bound_event.model.__name__
-
-    @staticmethod
-    def _get_model_reference(bound_event: BoundEvent, namespace: str = None):
-        return bound_event.event.create_doc(namespace or "/", bound_event.additional_docs)
-
-    @staticmethod
-    def _get_model_schema(bound_event: BoundEvent):
-        return {"payload": bound_event.model.schema()}
-
     def _get_event_name(self, bound_event: BoundEvent):
         if self.use_kebab_case:
             return bound_event.event.name.replace("_", "-")
         return bound_event.event.name
 
+    @staticmethod
+    def _get_model_reference(bound_event: BoundEvent, namespace: str = None):
+        return bound_event.event.create_doc(namespace or "/", bound_event.additional_docs)
+
     def extract_doc_channels(self, namespace: str = None) -> OrderedDict[str, ...]:
         return OrderedDict((self._get_event_name(bound_event), self._get_model_reference(bound_event, namespace))
                            for bound_event in self.bound_events)
 
+    @staticmethod
+    def _get_model_name(bound_model: Type[BaseModel]):
+        return bound_model.__name__
+
+    @staticmethod
+    def _get_model_schema(bound_model: Type[BaseModel]):
+        return {"payload": bound_model.schema()}
+
     def extract_doc_messages(self) -> OrderedDict[str, ...]:
-        return OrderedDict((self._get_model_name(bound_event), self._get_model_schema(bound_event))
-                           for bound_event in self.bound_events)
+        return OrderedDict((self._get_model_name(bound_model), self._get_model_schema(bound_model))
+                           for bound_model in self.bound_models)
 
     def extract_handlers(self) -> Iterable[tuple[str, Callable]]:
         for bound_event in self.bound_events:
@@ -75,11 +72,15 @@ class EventGroup:
     def _bind_event(self, bound_event: BoundEvent):
         self.bound_events.append(bound_event)
 
+    def _bind_model(self, bound_model: Type[BaseModel]):
+        self.bound_models.append(bound_model)
+
     def bind_pub(self, model: Type[BaseModel], *, description: str = None,
                  name: str = None) -> Callable[[Callable], ClientEvent]:
         if self.use_kebab_case:
             name = self._kebabify(name, model)
         event = ClientEvent(model, name, description)
+        self._bind_model(model)
 
         def bind_pub_wrapper(function) -> ClientEvent:
             self._bind_event(BoundEvent(event, model, function, getattr(function, "__sio_doc__", None)))
@@ -92,14 +93,21 @@ class EventGroup:
             name = self._kebabify(name, model)
         event = ServerEvent(model, name, description)
         self._bind_event(BoundEvent(event, model))
+        self._bind_model(model)
         return event
 
-    def bind_dup(self, model: Type[BaseModel], *, description: str = None,
-                 name: str = None) -> Callable[[Callable], DuplexEvent]:
+    def bind_dup(self, model: Type[BaseModel], server_model: Type[BaseModel] = None, *,
+                 description: str = None, name: str = None) -> Callable[[Callable], DuplexEvent]:
         if self.use_kebab_case:
             name = self._kebabify(name, model)
-        event = DuplexEvent.similar(model, name)
+
+        if server_model is None:
+            event = DuplexEvent.similar(model, name)
+        else:
+            event = DuplexEvent(ClientEvent(model, name, description), ServerEvent(server_model, name, description))
+            self._bind_model(server_model)
         event.description = description
+        self._bind_model(model)
 
         def bind_dup_wrapper(function) -> DuplexEvent:
             self._bind_event(BoundEvent(event, model, function, getattr(function, "__sio_doc__", None)))

@@ -19,9 +19,6 @@ class BaseEvent:  # do not instantiate!
     def attach_name(self, name: str):
         raise NotImplementedError
 
-    def attach_model_name(self, name: str):
-        raise NotImplementedError
-
     def create_doc(self, namespace: str, additional_docs: dict = None):
         raise NotImplementedError
 
@@ -30,20 +27,17 @@ class Event(BaseEvent):  # do not instantiate!
     def __init__(self, model: Type[BaseModel], name: str = None, description: str = None):
         super().__init__(name)
         self.model: Type[BaseModel] = model
-        self.model_name: str | None = None
         self.description: str = description
 
     def attach_name(self, name: str):
         self.name = name
 
-    def attach_model_name(self, name: str):
-        self.model_name = name
-
     def create_doc(self, namespace: str, additional_docs: dict = None):
+        model_name: str = getattr(self.model, "name", None) or self.model.__name__
         return remove_none({
             "description": self.description,
             "tags": [{"name": f"namespace-{namespace}"}],
-            "message": {"$ref": f"#/components/messages/{self.model_name or self.model.__name__}"}
+            "message": {"$ref": f"#/components/messages/{model_name}"}
         }, **(additional_docs or {}))
 
 
@@ -106,10 +100,6 @@ class DuplexEvent(BaseEvent):
         self.name = name
         self.client_event.name = name
         self.server_event.name = name
-
-    def attach_model_name(self, name: str):
-        self.client_event.model_name = name
-        self.server_event.model_name = name
 
     def emit(self, _room: str = None, _data: ... = None, **kwargs):
         return self.server_event.emit(_room, _data, **kwargs)
