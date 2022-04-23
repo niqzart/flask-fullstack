@@ -81,7 +81,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
         return doc_responses_wrapper
 
-    def marshal_with(self, fields: BaseModel | Type[Model], *args, **kwargs):
+    def marshal_with(self, fields: BaseModel | Type[Model], as_list=False, *args, **kwargs):
         result = super().marshal_with
 
         if isinstance(fields, type) and issubclass(fields, Model):
@@ -89,15 +89,17 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
             def marshal_with_wrapper(function: Callable) -> Callable[..., Model]:
                 @wraps(function)
-                @result(model, *args, **kwargs)
+                @result(model, as_list, *args, **kwargs)
                 def marshal_with_inner(*args, **kwargs):
+                    if as_list:
+                        return [fields.convert(d) for d in function(*args, **kwargs)]
                     return fields.convert(function(*args, **kwargs), **kwargs)
 
                 return marshal_with_inner
 
             return marshal_with_wrapper
 
-        return result(fields, *args, **kwargs)
+        return result(fields, as_list, *args, **kwargs)
 
     def marshal(self, data, fields: Type[Model] | ..., *args, **kwargs):
         if isinstance(fields, type) and issubclass(fields, Model):
