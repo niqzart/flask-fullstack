@@ -36,7 +36,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
         default_abort(code, message, **kwargs)
 
     def doc_abort(self, error_code: Union[int, str], description: str, *, critical: bool = False):
-        return self.response(*ResponseDoc.error_response("404 ", description).get_args())
+        return self.response(*ResponseDoc.error_response(error_code, description).get_args())
 
     def argument_parser(self, parser: RequestParser, use_undefined: bool = False):
         """
