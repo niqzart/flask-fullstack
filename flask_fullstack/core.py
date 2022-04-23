@@ -7,7 +7,8 @@ from typing import Type
 
 from flask import Flask as _Flask, Response, request
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager, get_jwt, set_access_cookies, create_access_token, get_jwt_identity
+from flask_jwt_extended import JWTManager, get_jwt, set_access_cookies, create_access_token, get_jwt_identity, \
+    unset_jwt_cookies
 from flask_restx import Api
 from sqlalchemy import create_engine, MetaData
 from werkzeug.exceptions import NotFound
@@ -49,7 +50,7 @@ class Flask(_Flask):
         return api
 
     def return_error(self, code: int, message: str):
-        return message, code
+        return Response(message, status=code)
 
     def configure_error_handlers(self, log_stuff: Callable[[str, str], None]):  # TODO redo with `logging`
         @self.errorhandler(NotFound)
@@ -92,23 +93,31 @@ class Flask(_Flask):
 
         @jwt.expired_token_loader
         def expired_token_callback(*_):
-            return self.return_error(401, "expired token")
+            response = self.return_error(401, "expired token")
+            unset_jwt_cookies(response)
+            return response
 
         @jwt.token_verification_failed_loader
         def verification_failed_callback(*_):
             log_stuff("error", f"Token verification somehow failed\n[`{datetime.utcnow()}`]")
-            return self.return_error(401, "token verification failed")
+            response = self.return_error(401, "token verification failed")
+            unset_jwt_cookies(response)
+            return response
 
         @jwt.invalid_token_loader
         def invalid_token_callback(callback):
             log_stuff("error", f"Invalid token: {callback}\n[`{datetime.utcnow()}`]")
-            return self.return_error(422, f"invalid token: {callback}")
+            response = self.return_error(422, f"invalid token: {callback}")
+            unset_jwt_cookies(response)
+            return response
 
         @jwt.unauthorized_loader
         def unauthorized_callback(callback: str):
             if callback.startswith("Missing cookie"):
                 log_stuff("error", f"Unauthorized: {callback}\n[`{datetime.utcnow()}`]")
-            return self.return_error(401, f"unauthorized: {callback}")
+            response = self.return_error(401, f"unauthorized: {callback}")
+            unset_jwt_cookies(response)
+            return response
 
         return jwt
 
