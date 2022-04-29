@@ -46,6 +46,12 @@ class EventGroup(BaseEventGroup, metaclass=ABCMeta):
             bound_model.Config.title = bound_model.name
         super()._bind_model(bound_model)
 
+    def doc_abort(self, error_code: Union[int, str], description: str, *, critical: bool = False):
+        def doc_abort_wrapper(function):
+            return function
+
+        return doc_abort_wrapper
+
     @staticmethod
     def _get_model_name(bound_model: Type[BaseModel]):
         if isinstance(bound_model, type) and issubclass(bound_model, Nameable):
