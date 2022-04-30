@@ -79,7 +79,10 @@ class JWTAuthorizerMixin(RawDatabaseSearcherMixin, metaclass=ABCMeta):
         ("422 ", "InvalidJWT", True)
     ]
 
-    def jwt_authorizer(self, role: Type[UserRole], optional: bool = False,
+    def _extract_jwt_identity(self) -> ... | None:
+        return get_jwt_identity()
+
+    def jwt_authorizer(self, role: Type[UserRole], *, optional: bool = False,
                        check_only: bool = False, use_session: bool = True):
         """
         - Authorizes user by JWT-token.
@@ -102,9 +105,13 @@ class JWTAuthorizerMixin(RawDatabaseSearcherMixin, metaclass=ABCMeta):
             @jwt_required(optional=optional)
             @self.with_begin
             def authorizer_inner(*args, **kwargs):
-                if (jwt := get_jwt_identity()) is None and optional:
-                    kwargs[role.__name__.lower()] = None
-                    return function(*args, **kwargs)
+                jwt = self._extract_jwt_identity()
+                if jwt is None:
+                    if optional:
+                        kwargs[role.__name__.lower()] = None
+                        return function(*args, **kwargs)
+                    self.abort(error_code, role.not_found_text)
+
                 kwargs["jwt"] = jwt
                 return self._database_searcher(role, check_only, True, use_session, error_code,
                                                function, args, kwargs, input_field_name="jwt")
