@@ -125,7 +125,7 @@ def create_fields(column: Column, name: str, use_defaults: bool = False, flatten
                   required: bool = None, attribute: str = None) -> dict[str, ...]:
     if not use_defaults or column.default is None or column.nullable or isinstance(column.default, Sequence):
         default = None
-        required = required or column.nullable
+        required = required or not column.nullable
     else:
         default = column.default.arg
         required = required or False
@@ -294,8 +294,9 @@ class Model(Nameable):
 
     @staticmethod
     def include_columns(*columns: Column, _use_defaults: bool = False, _flatten_jsons: bool = False,
-                        _require_all: bool = True, **named_columns: Column) -> Callable[[Type[t]], Type[t]]:
+                        _require_all: bool = None, **named_columns: Column) -> Callable[[Type[t]], Type[t]]:
         named_columns = {key.replace("_", "-"): value for key, value in named_columns.items()}
+
         # TODO allow different cases
 
         # TODO Maybe allow *columns: Column to do this here:
@@ -375,6 +376,49 @@ class Model(Nameable):
 
         return ModModel
 
+    @staticmethod
+    def include_nest_model(model: Type[Model], field_name: str, parameter_name: str = None,
+                           as_list: bool = False, required: bool = True) -> Callable[[Type[t]], Type[t]]:
+        if parameter_name is None:
+            parameter_name = field_name
+
+        def include_nest_model_inner(cls: Type[t]) -> Type[t]:
+            class ModModel(cls):
+                @classmethod
+                def convert(cls: Type[t], orm_object, **context) -> t:
+                    result: cls = super().convert(orm_object, **context)
+                    object.__setattr__(result, field_name, getattr(orm_object, parameter_name))
+                    return result
+
+                @classmethod
+                def model(cls) -> dict[str, RawField]:  # TODO workaround, replace with recursive registration
+                    return dict(super().model(), **{field_name: NestedField(
+                        flask_restx_has_bad_design.model(name=model.name, model=model.model()),
+                        required=required, as_list=as_list)})
+
+                @classmethod
+                def deconvert(cls: Type[t], data: dict[str, ...]) -> t:
+                    result: cls = super().deconvert(data)
+                    object.__setattr__(result, parameter_name, data[field_name])
+                    return result
+
+                @classmethod
+                def parser(cls, **kwargs) -> RequestParser:
+                    raise ValueError("Nested structures are not supported")
+
+            return ModModel
+
+        return include_nest_model_inner
+
+    @classmethod
+    def nest_model(cls, model: Type[Model], field_name: str, parameter_name: str = None,
+                   as_list: bool = False) -> Type[t]:
+        @cls.include_nest_model(model, field_name, parameter_name, as_list)
+        class ModModel(cls):
+            pass
+
+        return ModModel
+
     # TODO include_relationship decorator & relationship_model metagenerator-classmethod
 
     @staticmethod
@@ -386,6 +430,14 @@ class Model(Nameable):
             return ModModel
 
         return include_model_inner
+
+    @classmethod
+    def combine_with(cls, model: Type[Model]) -> Type[t]:
+        # only use as a property in a subclass of NamedProperties!
+        class ModModel(cls, model):
+            pass
+
+        return ModModel
 
     @staticmethod
     def include_context(*names, **var_types) -> Callable[[Type[t]], Type[t]]:  # TODO Maybe redo
