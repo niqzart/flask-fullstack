@@ -4,6 +4,11 @@ from enum import Enum
 from typing import Union
 
 
+@property
+def NotImplementedField(_):
+    raise NotImplementedError
+
+
 class TypeEnum(Enum):
     @classmethod
     def from_string(cls, string: str) -> Union[TypeEnum, None]:
