@@ -99,8 +99,22 @@ class JWTAuthorizerMixin(RawDatabaseSearcherMixin, metaclass=ABCMeta):
         ("422 ", "InvalidJWT", True)
     ]
 
-    def jwt_authorizer(self, role: Type[UserRole], *, result_field_name: str = None, optional: bool = False,
-                       check_only: bool = False, use_session: bool = True):
+    def _get_identity(self) -> dict | None:
+        jwt: dict = get_jwt_identity()
+        if not isinstance(jwt, dict):
+            return None
+        return jwt
+
+    @staticmethod
+    def with_required_jwt(**kwargs):
+        return jwt_required(**kwargs)
+
+    @staticmethod
+    def with_optional_jwt(**kwargs):
+        return jwt_required(optional=True, **kwargs)
+
+    def jwt_authorizer(self, role: Type[UserRole], auth_name: str = "", *, result_field_name: str = None,
+                       optional: bool = False, check_only: bool = False, use_session: bool = True):
         """
         - Authorizes user by JWT-token.
         - If token is missing or is not processable, falls back on flask-jwt-extended error handlers.
@@ -109,6 +123,7 @@ class JWTAuthorizerMixin(RawDatabaseSearcherMixin, metaclass=ABCMeta):
         - Can pass user and session objects to the decorated function.
 
         :param role: role to expect
+        :param auth_name: which identity to use for searching. "" is the default for single-auth setups
         :param optional: (default: False)
         :param check_only: (default: False) if True, user object won't be passed to the decorated function
         :param use_session: (default: True) whether to pass the session to the decorated function
@@ -126,12 +141,16 @@ class JWTAuthorizerMixin(RawDatabaseSearcherMixin, metaclass=ABCMeta):
             @jwt_required(optional=optional)
             @self.with_begin
             def authorizer_inner(*args, **kwargs):
-                if (target_id := get_jwt_identity()) is None and optional:
-                    kwargs[role.__name__.lower()] = None
-                    return function(*args, **kwargs)
+                identity = self._get_identity().get(auth_name, None)
+
+                if identity is None:
+                    if optional:
+                        kwargs[role.__name__.lower()] = None
+                        return function(*args, **kwargs)
+                    self.abort(*role.unauthorized_error)
 
                 session = get_or_pop(kwargs, "session", use_session)
-                if (result := role.find_by_identity(session, target_id)) is None:
+                if (result := role.find_by_identity(session, identity)) is None:
                     self.abort(*role.unauthorized_error)
 
                 if not check_only:

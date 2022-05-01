@@ -4,11 +4,13 @@ from collections.abc import Callable
 from functools import wraps
 from typing import Union, Type, Sequence
 
+from flask_jwt_extended import unset_jwt_cookies, set_access_cookies, create_access_token
 from flask_restx import Namespace, Model as BaseModel, abort as default_abort
 from flask_restx.fields import List as ListField, Boolean as BoolField, Integer as IntegerField, Nested
 from flask_restx.marshalling import marshal
 from flask_restx.reqparse import RequestParser
 
+from .interfaces import UserRole
 from .marshals import ResponseDoc, Model
 from .mixins import DatabaseSearcherMixin, JWTAuthorizerMixin
 from .sqlalchemy import Sessionmaker
@@ -37,6 +39,21 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
     def doc_abort(self, error_code: Union[int, str], description: str, *, critical: bool = False):
         return self.response(*ResponseDoc.error_response(error_code, description).get_args())
+
+    def add_authorization(self, response, auth_agent: UserRole, auth_name: str = "") -> None:
+        jwt = self._get_identity()
+        if jwt is None:
+            jwt = {}
+        jwt[auth_name] = auth_agent.get_identity()
+        set_access_cookies(response, create_access_token(identity=jwt))
+
+    def remove_authorization(self, response, auth_name: str = "") -> None:
+        jwt = self._get_identity()
+        unset_jwt_cookies(response)
+        if jwt is not None:
+            jwt.pop(auth_name)
+            if len(jwt) != 0:
+                set_access_cookies(response, create_access_token(identity=jwt))
 
     def argument_parser(self, parser: RequestParser, use_undefined: bool = False):
         """
