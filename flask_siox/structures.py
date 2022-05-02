@@ -13,7 +13,8 @@ from .events import ClientEvent, ServerEvent, DuplexEvent, BaseEvent
 
 def kebabify_model(model: Type[BaseModel]):
     for f_name, field in model.__fields__.items():
-        field.alias = field.name.replace("_", "-")
+        if field.alias == f_name:
+            field.alias = field.name.replace("_", "-")
 
 
 @dataclass
@@ -108,6 +109,8 @@ class EventGroup:
         if server_model is None:
             server_model = model
         else:
+            if self.use_kebab_case:
+                kebabify_model(server_model)
             self._bind_model(server_model)
 
         event = self.DuplexEvent(
@@ -119,7 +122,7 @@ class EventGroup:
         def bind_dup_wrapper(function) -> DuplexEvent:
             def handler(*args):
                 data = args[-1]
-                args = list(args)
+                args = list(args)  # TODO accurate is: list(args[:-1])
                 if use_event:
                     args.append(event)
                 result = function(*args, **model.parse_obj(data).dict())
