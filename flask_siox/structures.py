@@ -156,6 +156,30 @@ class Namespace(_Namespace):
         for name, handler in event_group.extract_handlers():
             setattr(self, f"on_{name.replace('-', '_')}", handler)
 
+    def on_event(self, name: str):
+        def on_event_wrapper(function: Callable[[...], None]):
+            setattr(self, f"on_{name}", function)
+
+        return on_event_wrapper
+
+    def on_connect(self, function: Callable[[...], None] | None = None):
+        if function is None:
+            def on_connect_wrapper(function: Callable[[...], None]):
+                setattr(self, f"on_connect", function)
+
+            return on_connect_wrapper
+
+        setattr(self, f"on_connect", function)
+
+    def on_disconnect(self, function: Callable[[...], None] = None):
+        if function is None:
+            def on_disconnect_wrapper(function: Callable[[...], None]):
+                setattr(self, f"on_disconnect", function)
+
+            return on_disconnect_wrapper
+
+        setattr(self, f"on_disconnect", function)
+
 
 class SocketIO(_SocketIO):
     def __init__(self, app=None, title: str = "SIO", version: str = "1.0.0", doc_path: str = "/doc/", **kwargs):
