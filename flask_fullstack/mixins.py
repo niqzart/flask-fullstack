@@ -74,8 +74,8 @@ class DatabaseSearcherMixin(RawDatabaseSearcherMixin, metaclass=ABCMeta):
         int_error_code: int = int(error_code)  # TODO redo doc_abort to handle this automagically
 
         def searcher_wrapper(function):
-            @wraps(function)
             @self.doc_abort(error_code, identifiable.not_found_text, critical=True)
+            @wraps(function)
             @self.with_begin
             def searcher_inner(*args, **kwargs):
                 session = get_or_pop(kwargs, "session", use_session)
@@ -136,8 +136,8 @@ class JWTAuthorizerMixin(RawDatabaseSearcherMixin, metaclass=ABCMeta):
             result_field_name = role.__name__.lower()
 
         def authorizer_wrapper(function):
-            @wraps(function)
             @self.doc_aborts(*auth_errors)
+            @wraps(function)
             @jwt_required(optional=optional)
             @self.with_begin
             def authorizer_inner(*args, **kwargs):
