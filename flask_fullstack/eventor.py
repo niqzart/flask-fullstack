@@ -2,8 +2,10 @@ from abc import ABCMeta
 from dataclasses import dataclass
 from typing import Union, Type
 
+from socketio.exceptions import ConnectionRefusedError
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_restx import Model
-from flask_socketio import disconnect
+from flask_socketio import disconnect, join_room
 from pydantic import BaseModel
 
 from .marshals import PydanticModel
@@ -69,6 +71,17 @@ class EventGroup(BaseEventGroup, metaclass=ABCMeta):
 
 
 class Namespace(_Namespace):
+    def __init__(self, namespace=None, protected: bool = False):
+        super().__init__(namespace)
+        if protected:
+            @self.on_connect()
+            @jwt_required(optional=True)
+            def user_connect(*_):
+                user_id = get_jwt_identity()
+                if user_id is None:
+                    raise ConnectionRefusedError("unauthorized!")
+                join_room(f"user-{user_id}")
+
     def handle_exception(self, exception: EventException):
         pass
 
