@@ -482,7 +482,7 @@ class PydanticModel(BaseModel, Model, ABC):
             raise NotImplementedError()
 
         if issubclass(field.type_, Model):
-            result = NestedField(flask_restx_has_bad_design.model(field.type_.__qualname__, field.type_.model()),
+            result = NestedField(flask_restx_has_bad_design.model(field.type_.name, field.type_.model()),
                                  **pydantic_field_to_kwargs(field))
         else:
             result = type_to_field[field.type_](**pydantic_field_to_kwargs(field))
