@@ -386,8 +386,14 @@ class Model(Nameable):
             class ModModel(cls):
                 @classmethod
                 def convert(cls: Type[t], orm_object, **context) -> t:
+                    nested = getattr(orm_object, parameter_name)
+                    if as_list:
+                        nested = [model.convert(item, **context) for item in nested]
+                    else:
+                        nested = model.convert(nested, **context)
+
                     result: cls = super().convert(orm_object, **context)
-                    object.__setattr__(result, field_name, getattr(orm_object, parameter_name))
+                    object.__setattr__(result, field_name, nested)
                     return result
 
                 @classmethod
