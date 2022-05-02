@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABCMeta
 from dataclasses import dataclass
 from typing import Union, Type
@@ -71,13 +73,13 @@ class EventGroup(BaseEventGroup, metaclass=ABCMeta):
 
 
 class Namespace(_Namespace):
-    def __init__(self, namespace=None, protected: bool = False):
+    def __init__(self, namespace=None, protected: str | bool = False):
         super().__init__(namespace)
-        if protected:
+        if protected is not False:
             @self.on_connect()
             @jwt_required(optional=True)
             def user_connect(*_):
-                user_id = get_jwt_identity()
+                user_id = get_jwt_identity()["" if protected is True else protected]
                 if user_id is None:
                     raise ConnectionRefusedError("unauthorized!")
                 join_room(f"user-{user_id}")
