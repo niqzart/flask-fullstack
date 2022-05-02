@@ -4,11 +4,13 @@ from collections.abc import Callable
 from functools import wraps
 from typing import Union, Type, Sequence
 
-from flask_jwt_extended import unset_jwt_cookies, set_access_cookies, create_access_token
+from flask import jsonify
+from flask_jwt_extended import unset_jwt_cookies, set_access_cookies, create_access_token, jwt_required
 from flask_restx import Namespace, Model as BaseModel, abort as default_abort
 from flask_restx.fields import List as ListField, Boolean as BoolField, Integer as IntegerField, Nested
 from flask_restx.marshalling import marshal
 from flask_restx.reqparse import RequestParser
+from flask_restx.utils import unpack
 
 from .interfaces import UserRole
 from .marshals import ResponseDoc, Model
@@ -40,20 +42,50 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
     def doc_abort(self, error_code: Union[int, str], description: str, *, critical: bool = False):
         return self.response(*ResponseDoc.error_response(error_code, description).get_args())
 
-    def add_authorization(self, response, auth_agent: UserRole, auth_name: str = "") -> None:
+    def add_authorization(self, response, auth_agent: UserRole, auth_name: str = None) -> None:
         jwt = self._get_identity()
         if jwt is None:
             jwt = {}
-        jwt[auth_name] = auth_agent.get_identity()
+        jwt[auth_name or ""] = auth_agent.get_identity()
         set_access_cookies(response, create_access_token(identity=jwt))
 
-    def remove_authorization(self, response, auth_name: str = "") -> None:
+    def remove_authorization(self, response, auth_name: str = None) -> None:
         jwt = self._get_identity()
         unset_jwt_cookies(response)
         if jwt is not None:
-            jwt.pop(auth_name)
+            jwt.pop(auth_name or "")
             if len(jwt) != 0:
                 set_access_cookies(response, create_access_token(identity=jwt))
+
+    def adds_authorization(self, auth_name: str = None):
+        def adds_authorization_wrapper(function):
+            @wraps(function)
+            @jwt_required(optional=True)
+            def adds_authorization_inner(*args, **kwargs):
+                response, result, headers = unpack(function(*args, **kwargs))
+                if isinstance(result, UserRole):
+                    response = jsonify(response)
+                    self.add_authorization(response, result, auth_name)
+                    return response, 200, headers
+                return response, result, headers
+
+            return adds_authorization_inner
+
+        return adds_authorization_wrapper
+
+    def removes_authorization(self, auth_name: str = None):
+        def removes_authorization_wrapper(function):
+            @wraps(function)
+            @jwt_required(optional=True)
+            def removes_authorization_inner(*args, **kwargs):
+                response, code, headers = unpack(function(*args, **kwargs))
+                response = jsonify(response)
+                self.remove_authorization(response, auth_name)
+                return response, code, headers
+
+            return removes_authorization_inner
+
+        return removes_authorization_wrapper
 
     def argument_parser(self, parser: RequestParser, use_undefined: bool = False):
         """
