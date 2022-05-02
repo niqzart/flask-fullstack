@@ -141,9 +141,7 @@ class JWTAuthorizerMixin(RawDatabaseSearcherMixin, metaclass=ABCMeta):
             @jwt_required(optional=optional)
             @self.with_begin
             def authorizer_inner(*args, **kwargs):
-                identity = self._get_identity().get(auth_name, None)
-
-                if identity is None:
+                if (t := self._get_identity()) is None or (identity := t.get(auth_name, None)) is None:
                     if optional:
                         kwargs[role.__name__.lower()] = None
                         return function(*args, **kwargs)

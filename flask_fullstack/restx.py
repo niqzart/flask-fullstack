@@ -4,7 +4,7 @@ from collections.abc import Callable
 from functools import wraps
 from typing import Union, Type, Sequence
 
-from flask import jsonify
+from flask import jsonify, Response
 from flask_jwt_extended import unset_jwt_cookies, set_access_cookies, create_access_token, jwt_required
 from flask_restx import Namespace, Model as BaseModel, abort as default_abort
 from flask_restx.fields import List as ListField, Boolean as BoolField, Integer as IntegerField, Nested
@@ -64,9 +64,9 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
             def adds_authorization_inner(*args, **kwargs):
                 response, result, headers = unpack(function(*args, **kwargs))
                 if isinstance(result, UserRole):
-                    response = jsonify(response)
+                    response = Response(response, 200, headers)
                     self.add_authorization(response, result, auth_name)
-                    return response, 200, headers
+                    return response
                 return response, result, headers
 
             return adds_authorization_inner
