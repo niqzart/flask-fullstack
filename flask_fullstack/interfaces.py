@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Union
+from typing import Type, TypeVar
+
+t = TypeVar("t", bound="Identifiable")
+v = TypeVar("v")
 
 
 class Identifiable:
@@ -17,19 +20,25 @@ class Identifiable:
         pass
 
     @classmethod
-    def find_by_id(cls, session, entry_id: int) -> Union[Identifiable, None]:
+    def find_by_id(cls: Type[t], session, entry_id: int) -> t | None:
         raise NotImplementedError
 
 
-class UserRole(Identifiable):
+class UserRole:
     """
     An interface to mark database classes as user roles, that can be used for authorization.
 
     Used in :ref:`.Namespace.jwt_authorizer`
     """
 
-    default_role: Union[UserRole, None] = None
+    unauthorized_error: tuple[int | str, str] = (403, "Permission denied")
+
+    def __init__(self, **kwargs):
+        pass
 
     @classmethod
-    def find_by_id(cls, session, entry_id: int) -> Union[UserRole, None]:
+    def find_by_identity(cls: Type[t], session, identity: v) -> t | None:
+        raise NotImplementedError
+
+    def get_identity(self) -> v:
         raise NotImplementedError
