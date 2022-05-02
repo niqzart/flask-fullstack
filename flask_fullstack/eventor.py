@@ -76,11 +76,14 @@ class Namespace(_Namespace):
     def __init__(self, namespace=None, protected: str | bool = False):
         super().__init__(namespace)
         if protected is not False:
+            if protected is True:
+                protected = ""
+
             @self.on_connect()
             @jwt_required(optional=True)
             def user_connect(*_):
-                user_id = get_jwt_identity()["" if protected is True else protected]
-                if user_id is None:
+                identity = get_jwt_identity()
+                if identity is None or (user_id := identity.get(protected, None)) is None:
                     raise ConnectionRefusedError("unauthorized!")
                 join_room(f"user-{user_id}")
 
