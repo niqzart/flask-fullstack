@@ -4,7 +4,7 @@ from collections.abc import Callable
 from functools import wraps
 from typing import Union, Type, Sequence
 
-from flask import Response, jsonify
+from flask import jsonify
 from flask_jwt_extended import unset_jwt_cookies, set_access_cookies, create_access_token, jwt_required
 from flask_restx import Namespace, Model as BaseModel, abort as default_abort
 from flask_restx.fields import List as ListField, Boolean as BoolField, Integer as IntegerField, Nested
@@ -63,8 +63,8 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
             @jwt_required(optional=True)
             def adds_authorization_inner(*args, **kwargs):
                 response, result, headers = unpack(function(*args, **kwargs))
-                if isinstance(result, UserRole):
-                    response = Response(response, 200, headers)
+                if isinstance(result, UserRole):  # TODO passthrough for headers
+                    response = jsonify(response)
                     self.add_authorization(response, result, auth_name)
                     return response
                 return response, result, headers
@@ -79,7 +79,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
             @jwt_required(optional=True)
             def removes_authorization_inner(*args, **kwargs):
                 response, code, headers = unpack(function(*args, **kwargs))
-                response = Response(response, code, headers)
+                response = jsonify(response)  # TODO passthrough for headers & code
                 self.remove_authorization(response, auth_name)
                 return response
 
@@ -180,7 +180,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
             @jwt_required(optional=True)
             def marshal_with_authorization_inner(*args, **kwargs):
                 response, result, headers = unpack(function(*args, **kwargs))
-                if isinstance(result, UserRole):
+                if isinstance(result, UserRole):  # TODO passthrough for headers
                     response = jsonify(self.marshal(response, fields, skip_none=True))
                     self.add_authorization(response, result, auth_name)
                     return response
