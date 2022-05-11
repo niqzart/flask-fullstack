@@ -86,7 +86,7 @@ class EventGroup:
 
         def bind_pub_wrapper(function) -> ClientEvent:
             def handler(data=None):
-                return function(**model.parse_obj(data).dict())
+                return function(None, **model.parse_obj(data).dict())  # TODO temp, pass self or smth
 
             self._bind_event(BoundEvent(event, model, handler, getattr(function, "__sio_doc__", None)))
             return event
@@ -102,7 +102,7 @@ class EventGroup:
         return event
 
     def bind_dup(self, model: Type[BaseModel], server_model: Type[BaseModel] = None, *, description: str = None,
-                 name: str = None, echo: bool = False, use_event: bool = False) -> Callable[[Callable], DuplexEvent]:
+                 name: str = None, use_event: bool = False) -> Callable[[Callable], DuplexEvent]:
         if self.use_kebab_case:
             name = self._kebabify(name, model)
 
@@ -125,9 +125,7 @@ class EventGroup:
                 args = list(args)  # TODO accurate is: list(args[:-1])
                 if use_event:
                     args.append(event)
-                result = function(*args, **model.parse_obj(data).dict())
-                if echo:
-                    event.emit(*result)
+                return function(*args, **model.parse_obj(data).dict())
 
             self._bind_event(BoundEvent(event, model, handler, getattr(function, "__sio_doc__", None)))
             return event

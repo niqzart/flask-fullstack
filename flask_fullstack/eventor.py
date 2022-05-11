@@ -31,7 +31,7 @@ class EventException(Exception):
 class ServerEvent(_ServerEvent):
     def emit(self, _room: str = None, _include_self: bool = True, _data: ... = None, **kwargs):
         if issubclass(self.model, PydanticModel) and _data is not None:
-            _data = self.model.convert(_data)
+            _data = self.model.convert(_data, **kwargs)
         return super().emit(_room, _include_self, _data, **kwargs)
 
 
@@ -92,7 +92,7 @@ class Namespace(_Namespace):
 
     def trigger_event(self, event, *args):
         try:
-            super().trigger_event(event.replace("-", "_"), *args)
+            return super().trigger_event(event.replace("-", "_"), *args)
         except EventException as e:
             self.handle_exception(e)
             if e.critical:
