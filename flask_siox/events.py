@@ -70,12 +70,12 @@ class ServerEvent(Event):
         }
         self.model.Config.allow_population_by_field_name = True
 
-    def emit(self, _room: str = None, _include_self: bool = True, _data: ... = None, **kwargs):
+    def emit(self, _room: str = None, _include_self: bool = True, _data: ... = None, _namespace: str = None, **kwargs):
         if _data is None:
             _data: BaseModel = self.model(**kwargs)
         elif not isinstance(_data, self.model):
             _data: BaseModel = self.model.parse_obj(_data)
-        emit(self.name, _data.dict(**self._emit_kwargs), to=_room, include_self=_include_self)
+        emit(self.name, _data.dict(**self._emit_kwargs), to=_room, include_self=_include_self, namespace=_namespace)
 
     def create_doc(self, namespace: str, additional_docs: dict = None):
         return {"subscribe": super().create_doc(namespace, additional_docs)}
@@ -101,8 +101,8 @@ class DuplexEvent(BaseEvent):
         self.client_event.name = name
         self.server_event.name = name
 
-    def emit(self, _room: str = None, _include_self: bool = True, _data: ... = None, **kwargs):
-        return self.server_event.emit(_room, _include_self, _data, **kwargs)
+    def emit(self, _room: str = None, _include_self: bool = True, _data: ... = None, _namespace: str = None, **kwargs):
+        return self.server_event.emit(_room, _include_self, _data, _namespace, **kwargs)
 
     def bind(self, function):
         return self.client_event.bind(function)
