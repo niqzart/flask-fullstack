@@ -490,6 +490,8 @@ class PydanticModel(BaseModel, Model, ABC):
         if issubclass(field.type_, Model):
             result = NestedField(flask_restx_has_bad_design.model(field.type_.name, field.type_.model()),
                                  **pydantic_field_to_kwargs(field))
+        elif issubclass(field.type_, TypeEnum):
+            result = StringField(enum=field.type_.get_all_field_names(), **pydantic_field_to_kwargs(field))
         else:
             result = type_to_field[field.type_](**pydantic_field_to_kwargs(field))
 
