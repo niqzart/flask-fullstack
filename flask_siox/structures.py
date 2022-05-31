@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
+from logging import Filter, getLogger
 from typing import Type, Iterable
 
 from flask_socketio import Namespace as _Namespace, SocketIO as _SocketIO
@@ -182,11 +183,19 @@ class Namespace(_Namespace):
         setattr(self, f"on_disconnect", function)
 
 
+class NoPingPongFilter(Filter):
+    def filter(self, record):
+        return not ("Received packet PONG" in record.getMessage() or "Sending packet PING" in record.getMessage())
+
+
 class SocketIO(_SocketIO):
-    def __init__(self, app=None, title: str = "SIO", version: str = "1.0.0", doc_path: str = "/doc/", **kwargs):
+    def __init__(self, app=None, title: str = "SIO", version: str = "1.0.0", doc_path: str = "/doc/",
+                 remove_ping_pong_logs: bool = False, **kwargs):
         self.async_api = {"asyncapi": "2.2.0", "info": {"title": title, "version": version},
                           "channels": OrderedDict(), "components": {"messages": OrderedDict()}}
         self.doc_path = doc_path
+        if remove_ping_pong_logs:
+            getLogger("engineio.server").addFilter(NoPingPongFilter())
         super(SocketIO, self).__init__(app, **kwargs)
 
     def docs(self):
