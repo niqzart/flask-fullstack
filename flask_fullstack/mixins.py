@@ -4,7 +4,7 @@ from abc import ABCMeta
 from functools import wraps
 from typing import Type, Union
 
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request, get_jwt
 
 from .interfaces import Identifiable, UserRole
 from .utils import get_or_pop
@@ -100,7 +100,12 @@ class JWTAuthorizerMixin(RawDatabaseSearcherMixin, metaclass=ABCMeta):
     ]
 
     def _get_identity(self) -> dict | None:
-        jwt: dict = get_jwt_identity()
+        try:
+            verify_jwt_in_request(optional=True)
+            jwt: dict = get_jwt_identity()
+        except Exception:
+            return None
+
         if not isinstance(jwt, dict):
             return None
         return jwt

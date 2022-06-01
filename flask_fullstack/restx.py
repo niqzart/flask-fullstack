@@ -60,7 +60,6 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
     def adds_authorization(self, auth_name: str = None):
         def adds_authorization_wrapper(function):
             @wraps(function)
-            @jwt_required(optional=True)
             def adds_authorization_inner(*args, **kwargs):
                 response, result, headers = unpack(function(*args, **kwargs))
                 if isinstance(result, UserRole):  # TODO passthrough for headers
@@ -76,7 +75,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
     def removes_authorization(self, auth_name: str = None):
         def removes_authorization_wrapper(function):
             @wraps(function)
-            @jwt_required(optional=True)
+            @jwt_required()
             def removes_authorization_inner(*args, **kwargs):
                 response, code, headers = unpack(function(*args, **kwargs))
                 response = jsonify(response)  # TODO passthrough for headers & code
@@ -177,7 +176,6 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
             function.__apidoc__ = merge(getattr(function, "__apidoc__", {}), doc)
 
             @wraps(function)
-            @jwt_required(optional=True)
             def marshal_with_authorization_inner(*args, **kwargs):
                 response, result, headers = unpack(function(*args, **kwargs))
                 if isinstance(result, UserRole):  # TODO passthrough for headers
