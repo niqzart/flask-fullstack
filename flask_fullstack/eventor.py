@@ -2,19 +2,22 @@ from __future__ import annotations
 
 from abc import ABCMeta
 from dataclasses import dataclass
+from datetime import datetime
+from json import dumps, loads
 from typing import Union, Type
 
-from socketio.exceptions import ConnectionRefusedError
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_restx import Model
 from flask_socketio import disconnect, join_room
 from pydantic import BaseModel
+from socketio.exceptions import ConnectionRefusedError
 
 from .marshals import PydanticModel
 from .mixins import DatabaseSearcherMixin, JWTAuthorizerMixin
 from .sqlalchemy import Sessionmaker
-from .utils import Nameable
-from ..flask_siox import Namespace as _Namespace, EventGroup as _EventGroup, ServerEvent as _ServerEvent
+from .utils import Nameable, TypeEnum
+from ..flask_siox import (Namespace as _Namespace, EventGroup as _EventGroup,
+                          ServerEvent as _ServerEvent, SocketIO as _SocketIO)
 
 
 class BaseEventGroup(_EventGroup, DatabaseSearcherMixin, JWTAuthorizerMixin, metaclass=ABCMeta):
@@ -98,7 +101,28 @@ class Namespace(_Namespace):
             if e.critical:
                 disconnect()
 
-# class SocketIO(_SocketIO):
+
+class CustomJSON:
+    def default(self, value: ...) -> ...:
+        if isinstance(value, TypeEnum):
+            return value.to_string()
+        if isinstance(value, datetime):
+            return value.isoformat()
+        return value
+
+    def dumps(self, *args, **kwargs):
+        return dumps(*args, default=self.default, **kwargs)
+
+    def loads(self, *args, **kwargs):
+        return loads(*args, **kwargs)
+
+
+class SocketIO(_SocketIO):
+    def __init__(self, *args, **kwargs):
+        if "json" not in kwargs:
+            kwargs["json"] = CustomJSON
+        super().__init__(*args, **kwargs)
+
 #     def __init__(self, app=None, title: str = "SIO", version: str = "1.0.0", doc_path: str = "/doc/", **kwargs):
 #         super().__init__(app, title, version, doc_path, **kwargs)
 #
