@@ -70,12 +70,15 @@ class ServerEvent(Event):
         }
         self.model.Config.allow_population_by_field_name = True
 
+    def _emit(self, data: dict, namespace: str = None, room: str = None, include_self: bool = True):
+        return emit(self.name, data, to=room, include_self=include_self, namespace=namespace)
+
     def emit(self, _room: str = None, _include_self: bool = True, _data: ... = None, _namespace: str = None, **kwargs):
         if _data is None:
             _data: BaseModel = self.model(**kwargs)
         elif not isinstance(_data, self.model):
             _data: BaseModel = self.model.parse_obj(_data)
-        emit(self.name, _data.dict(**self._emit_kwargs), to=_room, include_self=_include_self, namespace=_namespace)
+        return self._emit(_data.dict(**self._emit_kwargs), _namespace, _room, _include_self)
 
     def create_doc(self, namespace: str, additional_docs: dict = None):
         return {"subscribe": super().create_doc(namespace, additional_docs)}

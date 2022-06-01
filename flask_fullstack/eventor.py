@@ -32,10 +32,10 @@ class EventException(Exception):
 
 
 class ServerEvent(_ServerEvent):
-    def emit(self, _room: str = None, _include_self: bool = True, _data: ... = None, **kwargs):
+    def emit(self, _room: str = None, _include_self: bool = True, _data: ... = None, _namespace: str = None, **kwargs):
         if issubclass(self.model, PydanticModel) and _data is not None:
             _data = self.model.convert(_data, **kwargs)
-        return super().emit(_room, _include_self, _data, **kwargs)
+        return super().emit(_room, _include_self, _data, _namespace, **kwargs)
 
 
 class EventGroup(BaseEventGroup, metaclass=ABCMeta):
