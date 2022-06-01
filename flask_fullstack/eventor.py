@@ -108,7 +108,7 @@ class CustomJSON:
             return value.to_string()
         if isinstance(value, datetime):
             return value.isoformat()
-        return value
+        raise TypeError(f"Type {type(value)} not serializable")
 
     def dumps(self, *args, **kwargs):
         return dumps(*args, default=self.default, **kwargs)
