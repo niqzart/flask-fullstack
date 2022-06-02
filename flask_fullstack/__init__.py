@@ -1,5 +1,5 @@
 from .core import Flask, configure_logging, configure_whooshee, configure_sqlalchemy
-from .eventor import EventGroup, BaseEventGroup, Namespace
+from .eventor import EventGroup, BaseEventGroup, Namespace, SocketIO
 from .interfaces import Identifiable, UserRole
 from .marshals import LambdaFieldDef, Marshalable, create_marshal_model, unite_models  # DEPRECATED
 from .marshals import ResponseDoc, DateTimeField, Model, PydanticModel

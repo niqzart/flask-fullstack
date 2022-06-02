@@ -103,24 +103,27 @@ class Namespace(_Namespace):
 
 
 class CustomJSON:
-    def default(self, value: ...) -> ...:
+    @staticmethod
+    def default(value: ...) -> ...:
         if isinstance(value, TypeEnum):
             return value.to_string()
         if isinstance(value, datetime):
             return value.isoformat()
         raise TypeError(f"Type {type(value)} not serializable")
 
-    def dumps(self, *args, **kwargs):
-        return dumps(*args, default=self.default, **kwargs)
+    @staticmethod
+    def dumps(*args, **kwargs):
+        return dumps(*args, default=CustomJSON.default, **kwargs)
 
-    def loads(self, *args, **kwargs):
+    @staticmethod
+    def loads(*args, **kwargs):
         return loads(*args, **kwargs)
 
 
 class SocketIO(_SocketIO):
     def __init__(self, *args, **kwargs):
         if "json" not in kwargs:
-            kwargs["json"] = CustomJSON
+            kwargs["json"] = CustomJSON()
         super().__init__(*args, **kwargs)
 
 #     def __init__(self, app=None, title: str = "SIO", version: str = "1.0.0", doc_path: str = "/doc/", **kwargs):
