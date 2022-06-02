@@ -487,17 +487,18 @@ class PydanticModel(BaseModel, Model, ABC):
         if isinstance(field.type_, ForwardRef):
             raise NotImplementedError()
 
+        kwargs = pydantic_field_to_kwargs(field)
         if issubclass(field.type_, Model):
-            result = NestedField(flask_restx_has_bad_design.model(field.type_.name, field.type_.model()),
-                                 **pydantic_field_to_kwargs(field))
+            result = NestedField(flask_restx_has_bad_design.model(field.type_.name, field.type_.model()), **kwargs)
         elif issubclass(field.type_, TypeEnum):
-            result = StringField(enum=field.type_.get_all_field_names(), **pydantic_field_to_kwargs(field))
+            result = StringField(attribute=lambda x: getattr(x, field.name).to_string(),
+                                 enum=field.type_.get_all_field_names(), **kwargs)
         else:
-            result = type_to_field[field.type_](**pydantic_field_to_kwargs(field))
+            result = type_to_field[field.type_](**kwargs)
 
         if field.type_ is not field.outer_type_:
             result = ListField(result, **pydantic_field_to_kwargs(field))
-        result.attribute = field.name
+        result.attribute = result.attribute or field.name
         return result
 
     @classmethod
