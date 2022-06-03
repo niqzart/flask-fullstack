@@ -64,11 +64,12 @@ class Flask(_Flask):
             log_stuff("error", error_text)
             return self.return_error(500, error_text)
 
-    def configure_jwt_manager(self, location: list[str], access_expires: timedelta) -> JWTManager:
+    def configure_jwt_manager(self, location: list[str], access_expires: timedelta, samesite_cookie: str = "None",
+                              csrf_protect: bool = True) -> JWTManager:
         self.config["JWT_TOKEN_LOCATION"] = location
-        self.config["JWT_COOKIE_CSRF_PROTECT"] = False
-        self.config["JWT_COOKIE_SAMESITE"] = "None"
-        self.config["JWT_COOKIE_SECURE"] = True
+        self.config["JWT_COOKIE_CSRF_PROTECT"] = csrf_protect
+        self.config["JWT_COOKIE_SAMESITE"] = samesite_cookie
+        self.config["JWT_COOKIE_SECURE"] = samesite_cookie == "None"
         self.config["JWT_BLACKLIST_ENABLED"] = True
         self.config["JWT_ACCESS_TOKEN_EXPIRES"] = access_expires
         self.config["JWT_BLACKLIST_TOKEN_CHECKS"] = ["access"]
@@ -88,8 +89,9 @@ class Flask(_Flask):
         return jwt
 
     def configure_jwt_with_loaders(self, location: list[str], access_expires: timedelta,
-                                   log_stuff: Callable[[str, str], None]) -> JWTManager:
-        jwt = self.configure_jwt_manager(location, access_expires)
+                                   log_stuff: Callable[[str, str], None], samesite_cookie: str = "None",
+                                   csrf_protect: bool = True) -> JWTManager:
+        jwt = self.configure_jwt_manager(location, access_expires, samesite_cookie, csrf_protect)
 
         @jwt.expired_token_loader
         def expired_token_callback(*_):
