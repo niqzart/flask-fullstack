@@ -149,12 +149,12 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
         return result(fields, as_list, *args, **kwargs)
 
-    def marshal(self, data, fields: Type[Model] | ..., *args, **kwargs):
+    def marshal(self, data, fields: Type[Model] | ..., context=None, *args, **kwargs):
         if isinstance(fields, type) and issubclass(fields, Model):
             if isinstance(data, Sequence):
-                data = [fields.convert(d) for d in data]
+                data = [fields.convert(d, **context or {}) for d in data]
             else:
-                data = fields.convert(data)
+                data = fields.convert(data, **context or {})
             fields = self.models.get(fields.name, None) or self.model(model=fields)
         return marshal(data, fields, *args, **kwargs)
 
@@ -179,7 +179,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
             def marshal_with_authorization_inner(*args, **kwargs):
                 response, result, headers = unpack(function(*args, **kwargs))
                 if isinstance(result, UserRole):  # TODO passthrough for headers
-                    response = jsonify(self.marshal(response, fields, skip_none=True))
+                    response = jsonify(self.marshal(response, fields, skip_none=True, context=kwargs))
                     self.add_authorization(response, result, auth_name)
                     return response
                 return response, result, headers
