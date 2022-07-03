@@ -98,7 +98,8 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
             def argument_inner(*args, **kwargs):
                 kwargs.update(parser.parse_args())
                 if use_undefined:
-                    kwargs.update({args.name: Undefined for args in parser.args if args.name not in kwargs.keys()})
+                    kwargs.update({args.dest or args.name: Undefined for args in parser.args
+                                   if args.dest or args.name not in kwargs.keys()})
                 return function(*args, **kwargs)
 
             return argument_inner
