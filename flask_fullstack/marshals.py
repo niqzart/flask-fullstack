@@ -377,8 +377,8 @@ class Model(Nameable):
         return ModModel
 
     @staticmethod
-    def include_nest_model(model: Type[Model], field_name: str, parameter_name: str = None,
-                           as_list: bool = False, required: bool = True) -> Callable[[Type[t]], Type[t]]:
+    def include_nest_model(model: Type[Model], field_name: str, parameter_name: str = None, as_list: bool = False,
+                           required: bool = True, skip_none: bool = True) -> Callable[[Type[t]], Type[t]]:
         if parameter_name is None:
             parameter_name = field_name
 
@@ -400,7 +400,7 @@ class Model(Nameable):
                 def model(cls) -> dict[str, RawField]:  # TODO workaround, replace with recursive registration
                     return dict(super().model(), **{field_name: NestedField(
                         flask_restx_has_bad_design.model(name=model.name, model=model.model()),
-                        required=required, as_list=as_list)})
+                        required=required, as_list=as_list, allow_null=not required, skip_none=skip_none)})
 
                 @classmethod
                 def deconvert(cls: Type[t], data: dict[str, ...]) -> t:
@@ -418,8 +418,8 @@ class Model(Nameable):
 
     @classmethod
     def nest_model(cls, model: Type[Model], field_name: str, parameter_name: str = None,
-                   as_list: bool = False) -> Type[t]:
-        @cls.include_nest_model(model, field_name, parameter_name, as_list)
+                   as_list: bool = False, required: bool = True, skip_none: bool = True) -> Type[t]:
+        @cls.include_nest_model(model, field_name, parameter_name, as_list, required, skip_none)
         class ModModel(cls):
             pass
 
