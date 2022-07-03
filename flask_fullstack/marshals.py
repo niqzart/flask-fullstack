@@ -389,7 +389,7 @@ class Model(Nameable):
                     nested = getattr(orm_object, parameter_name)
                     if as_list:
                         nested = [model.convert(item, **context) for item in nested]
-                    else:
+                    elif nested is not None:
                         nested = model.convert(nested, **context)
 
                     result: cls = super().convert(orm_object, **context)
