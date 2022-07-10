@@ -425,6 +425,44 @@ class Model(Nameable):
 
         return ModModel
 
+    @staticmethod
+    def include_flat_nest_model(model: Type[Model], parameter_name: str) -> Callable[[Type[t]], Type[t]]:
+        def include_flat_nest_model_inner(cls: Type[t]) -> Type[t]:
+            class ModModel(cls):
+                @classmethod
+                def convert(cls: Type[t], orm_object, **context) -> t:
+                    result: cls = super().convert(orm_object, **context)
+                    nested = getattr(orm_object, parameter_name)
+                    if nested is not None:
+                        nested = model.convert(nested, **context)
+                        for field_name in model.model():
+                            object.__setattr__(result, field_name, getattr(nested, field_name, None))
+                    return result
+
+                @classmethod
+                def model(cls) -> dict[str, RawField]:
+                    return dict(super().model(), **model.model())
+
+                @classmethod
+                def deconvert(cls: Type[t], data: dict[str, ...]) -> t:
+                    raise NotImplementedError("Inner flattened model deconverting is not supported yet")
+
+                @classmethod
+                def parser(cls, **kwargs) -> RequestParser:
+                    raise ValueError("Nested structures are not supported")
+
+            return ModModel
+
+        return include_flat_nest_model_inner
+
+    @classmethod
+    def nest_flat_model(cls, model: Type[Model], parameter_name: str) -> Type[t]:
+        @cls.include_flat_nest_model(model, parameter_name)
+        class ModModel(cls):
+            pass
+
+        return ModModel
+
     # TODO include_relationship decorator & relationship_model metagenerator-classmethod
 
     @staticmethod
