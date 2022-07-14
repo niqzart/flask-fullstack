@@ -377,8 +377,8 @@ class Model(Nameable):
         return ModModel
 
     @staticmethod
-    def include_nest_model(model: Type[Model], field_name: str, parameter_name: str = None,
-                           as_list: bool = False, required: bool = True) -> Callable[[Type[t]], Type[t]]:
+    def include_nest_model(model: Type[Model], field_name: str, parameter_name: str = None, as_list: bool = False,
+                           required: bool = True, skip_none: bool = True) -> Callable[[Type[t]], Type[t]]:
         if parameter_name is None:
             parameter_name = field_name
 
@@ -386,15 +386,21 @@ class Model(Nameable):
             class ModModel(cls):
                 @classmethod
                 def convert(cls: Type[t], orm_object, **context) -> t:
+                    nested = getattr(orm_object, parameter_name)
+                    if as_list:
+                        nested = [model.convert(item, **context) for item in nested]
+                    elif nested is not None:
+                        nested = model.convert(nested, **context)
+
                     result: cls = super().convert(orm_object, **context)
-                    object.__setattr__(result, field_name, getattr(orm_object, parameter_name))
+                    object.__setattr__(result, field_name, nested)
                     return result
 
                 @classmethod
                 def model(cls) -> dict[str, RawField]:  # TODO workaround, replace with recursive registration
                     return dict(super().model(), **{field_name: NestedField(
                         flask_restx_has_bad_design.model(name=model.name, model=model.model()),
-                        required=required, as_list=as_list)})
+                        required=required, as_list=as_list, allow_null=not required, skip_none=skip_none)})
 
                 @classmethod
                 def deconvert(cls: Type[t], data: dict[str, ...]) -> t:
@@ -412,8 +418,46 @@ class Model(Nameable):
 
     @classmethod
     def nest_model(cls, model: Type[Model], field_name: str, parameter_name: str = None,
-                   as_list: bool = False) -> Type[t]:
-        @cls.include_nest_model(model, field_name, parameter_name, as_list)
+                   as_list: bool = False, required: bool = True, skip_none: bool = True) -> Type[t]:
+        @cls.include_nest_model(model, field_name, parameter_name, as_list, required, skip_none)
+        class ModModel(cls):
+            pass
+
+        return ModModel
+
+    @staticmethod
+    def include_flat_nest_model(model: Type[Model], parameter_name: str) -> Callable[[Type[t]], Type[t]]:
+        def include_flat_nest_model_inner(cls: Type[t]) -> Type[t]:
+            class ModModel(cls):
+                @classmethod
+                def convert(cls: Type[t], orm_object, **context) -> t:
+                    result: cls = super().convert(orm_object, **context)
+                    nested = getattr(orm_object, parameter_name)
+                    if nested is not None:
+                        nested = model.convert(nested, **context)
+                        for field_name in model.model():
+                            object.__setattr__(result, field_name, getattr(nested, field_name, None))
+                    return result
+
+                @classmethod
+                def model(cls) -> dict[str, RawField]:
+                    return dict(super().model(), **model.model())
+
+                @classmethod
+                def deconvert(cls: Type[t], data: dict[str, ...]) -> t:
+                    raise NotImplementedError("Inner flattened model deconverting is not supported yet")
+
+                @classmethod
+                def parser(cls, **kwargs) -> RequestParser:
+                    raise ValueError("Nested structures are not supported")
+
+            return ModModel
+
+        return include_flat_nest_model_inner
+
+    @classmethod
+    def nest_flat_model(cls, model: Type[Model], parameter_name: str) -> Type[t]:
+        @cls.include_flat_nest_model(model, parameter_name)
         class ModModel(cls):
             pass
 
@@ -481,15 +525,18 @@ class PydanticModel(BaseModel, Model, ABC):
         if isinstance(field.type_, ForwardRef):
             raise NotImplementedError()
 
+        kwargs = pydantic_field_to_kwargs(field)
         if issubclass(field.type_, Model):
-            result = NestedField(flask_restx_has_bad_design.model(field.type_.__qualname__, field.type_.model()),
-                                 **pydantic_field_to_kwargs(field))
+            result = NestedField(flask_restx_has_bad_design.model(field.type_.name, field.type_.model()), **kwargs)
+        elif issubclass(field.type_, TypeEnum):
+            result = StringField(attribute=lambda x: getattr(x, field.name).to_string(),
+                                 enum=field.type_.get_all_field_names(), **kwargs)
         else:
-            result = type_to_field[field.type_](**pydantic_field_to_kwargs(field))
+            result = type_to_field[field.type_](**kwargs)
 
         if field.type_ is not field.outer_type_:
             result = ListField(result, **pydantic_field_to_kwargs(field))
-        result.attribute = field.name
+        result.attribute = result.attribute or field.name
         return result
 
     @classmethod

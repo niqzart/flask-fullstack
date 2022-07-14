@@ -4,7 +4,7 @@ from abc import ABCMeta
 from functools import wraps
 from typing import Type, Union
 
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request, get_jwt
 
 from .interfaces import Identifiable, UserRole
 from .utils import get_or_pop
@@ -74,8 +74,8 @@ class DatabaseSearcherMixin(RawDatabaseSearcherMixin, metaclass=ABCMeta):
         int_error_code: int = int(error_code)  # TODO redo doc_abort to handle this automagically
 
         def searcher_wrapper(function):
-            @wraps(function)
             @self.doc_abort(error_code, identifiable.not_found_text, critical=True)
+            @wraps(function)
             @self.with_begin
             def searcher_inner(*args, **kwargs):
                 session = get_or_pop(kwargs, "session", use_session)
@@ -100,7 +100,12 @@ class JWTAuthorizerMixin(RawDatabaseSearcherMixin, metaclass=ABCMeta):
     ]
 
     def _get_identity(self) -> dict | None:
-        jwt: dict = get_jwt_identity()
+        try:
+            verify_jwt_in_request(optional=True)
+            jwt: dict = get_jwt_identity()
+        except Exception:
+            return None
+
         if not isinstance(jwt, dict):
             return None
         return jwt
@@ -136,8 +141,8 @@ class JWTAuthorizerMixin(RawDatabaseSearcherMixin, metaclass=ABCMeta):
             result_field_name = role.__name__.lower()
 
         def authorizer_wrapper(function):
-            @wraps(function)
             @self.doc_aborts(*auth_errors)
+            @wraps(function)
             @jwt_required(optional=optional)
             @self.with_begin
             def authorizer_inner(*args, **kwargs):

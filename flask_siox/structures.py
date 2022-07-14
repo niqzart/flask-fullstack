@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
+from logging import Filter, getLogger
 from typing import Type, Iterable
 
 from flask_socketio import Namespace as _Namespace, SocketIO as _SocketIO
@@ -13,7 +14,8 @@ from .events import ClientEvent, ServerEvent, DuplexEvent, BaseEvent
 
 def kebabify_model(model: Type[BaseModel]):
     for f_name, field in model.__fields__.items():
-        field.alias = field.name.replace("_", "-")
+        if field.alias == f_name:
+            field.alias = field.name.replace("_", "-")
 
 
 @dataclass
@@ -85,7 +87,7 @@ class EventGroup:
 
         def bind_pub_wrapper(function) -> ClientEvent:
             def handler(data=None):
-                return function(**model.parse_obj(data).dict())
+                return function(None, **model.parse_obj(data).dict())  # TODO temp, pass self or smth
 
             self._bind_event(BoundEvent(event, model, handler, getattr(function, "__sio_doc__", None)))
             return event
@@ -101,13 +103,15 @@ class EventGroup:
         return event
 
     def bind_dup(self, model: Type[BaseModel], server_model: Type[BaseModel] = None, *, description: str = None,
-                 name: str = None, echo: bool = False, use_event: bool = False) -> Callable[[Callable], DuplexEvent]:
+                 name: str = None, use_event: bool = False) -> Callable[[Callable], DuplexEvent]:
         if self.use_kebab_case:
             name = self._kebabify(name, model)
 
         if server_model is None:
             server_model = model
         else:
+            if self.use_kebab_case:
+                kebabify_model(server_model)
             self._bind_model(server_model)
 
         event = self.DuplexEvent(
@@ -119,12 +123,10 @@ class EventGroup:
         def bind_dup_wrapper(function) -> DuplexEvent:
             def handler(*args):
                 data = args[-1]
-                args = list(args)
+                args = list(args)  # TODO accurate is: list(args[:-1])
                 if use_event:
                     args.append(event)
-                result = function(*args, **model.parse_obj(data).dict())
-                if echo:
-                    event.emit(*result)
+                return function(*args, **model.parse_obj(data).dict())
 
             self._bind_event(BoundEvent(event, model, handler, getattr(function, "__sio_doc__", None)))
             return event
@@ -156,12 +158,44 @@ class Namespace(_Namespace):
         for name, handler in event_group.extract_handlers():
             setattr(self, f"on_{name.replace('-', '_')}", handler)
 
+    def on_event(self, name: str):
+        def on_event_wrapper(function: Callable[[...], None]):
+            setattr(self, f"on_{name}", function)
+
+        return on_event_wrapper
+
+    def on_connect(self, function: Callable[[...], None] | None = None):
+        if function is None:
+            def on_connect_wrapper(function: Callable[[...], None]):
+                setattr(self, f"on_connect", function)
+
+            return on_connect_wrapper
+
+        setattr(self, f"on_connect", function)
+
+    def on_disconnect(self, function: Callable[[...], None] = None):
+        if function is None:
+            def on_disconnect_wrapper(function: Callable[[...], None]):
+                setattr(self, f"on_disconnect", function)
+
+            return on_disconnect_wrapper
+
+        setattr(self, f"on_disconnect", function)
+
+
+class NoPingPongFilter(Filter):
+    def filter(self, record):
+        return not ("Received packet PONG" in record.getMessage() or "Sending packet PING" in record.getMessage())
+
 
 class SocketIO(_SocketIO):
-    def __init__(self, app=None, title: str = "SIO", version: str = "1.0.0", doc_path: str = "/doc/", **kwargs):
+    def __init__(self, app=None, title: str = "SIO", version: str = "1.0.0", doc_path: str = "/doc/",
+                 remove_ping_pong_logs: bool = False, **kwargs):
         self.async_api = {"asyncapi": "2.2.0", "info": {"title": title, "version": version},
                           "channels": OrderedDict(), "components": {"messages": OrderedDict()}}
         self.doc_path = doc_path
+        if remove_ping_pong_logs:
+            getLogger("engineio.server").addFilter(NoPingPongFilter())
         super(SocketIO, self).__init__(app, **kwargs)
 
     def docs(self):

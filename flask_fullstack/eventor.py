@@ -1,16 +1,23 @@
+from __future__ import annotations
+
 from abc import ABCMeta
 from dataclasses import dataclass
+from datetime import datetime
+from json import dumps, loads
 from typing import Union, Type
 
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_restx import Model
-from flask_socketio import disconnect
+from flask_socketio import disconnect, join_room
 from pydantic import BaseModel
+from socketio.exceptions import ConnectionRefusedError
 
 from .marshals import PydanticModel
 from .mixins import DatabaseSearcherMixin, JWTAuthorizerMixin
 from .sqlalchemy import Sessionmaker
-from .utils import Nameable
-from ..flask_siox import Namespace as _Namespace, EventGroup as _EventGroup, ServerEvent as _ServerEvent
+from .utils import Nameable, TypeEnum
+from ..flask_siox import (Namespace as _Namespace, EventGroup as _EventGroup,
+                          ServerEvent as _ServerEvent, SocketIO as _SocketIO)
 
 
 class BaseEventGroup(_EventGroup, DatabaseSearcherMixin, JWTAuthorizerMixin, metaclass=ABCMeta):
@@ -25,10 +32,10 @@ class EventException(Exception):
 
 
 class ServerEvent(_ServerEvent):
-    def emit(self, _room: str = None, _include_self: bool = True, _data: ... = None, **kwargs):
+    def emit(self, _room: str = None, _include_self: bool = True, _data: ... = None, _namespace: str = None, **kwargs):
         if issubclass(self.model, PydanticModel) and _data is not None:
-            _data = self.model.convert(_data)
-        return super().emit(_room, _include_self, _data, **kwargs)
+            _data = self.model.convert(_data, **kwargs)
+        return super().emit(_room, _include_self, _data, _namespace, **kwargs)
 
 
 class EventGroup(BaseEventGroup, metaclass=ABCMeta):
@@ -69,18 +76,56 @@ class EventGroup(BaseEventGroup, metaclass=ABCMeta):
 
 
 class Namespace(_Namespace):
+    def __init__(self, namespace=None, protected: str | bool = False):
+        super().__init__(namespace)
+        if protected is not False:
+            if protected is True:
+                protected = ""
+
+            @self.on_connect()
+            @jwt_required(optional=True)
+            def user_connect(*_):
+                identity = get_jwt_identity()
+                if identity is None or (user_id := identity.get(protected, None)) is None:
+                    raise ConnectionRefusedError("unauthorized!")
+                join_room(f"user-{user_id}")
+
     def handle_exception(self, exception: EventException):
         pass
 
     def trigger_event(self, event, *args):
         try:
-            super().trigger_event(event.replace("-", "_"), *args)
+            return super().trigger_event(event.replace("-", "_"), *args)
         except EventException as e:
             self.handle_exception(e)
             if e.critical:
                 disconnect()
 
-# class SocketIO(_SocketIO):
+
+class CustomJSON:
+    @staticmethod
+    def default(value: ...) -> ...:
+        if isinstance(value, TypeEnum):
+            return value.to_string()
+        if isinstance(value, datetime):
+            return value.isoformat()
+        raise TypeError(f"Type {type(value)} not serializable")
+
+    @staticmethod
+    def dumps(*args, **kwargs):
+        return dumps(*args, default=CustomJSON.default, **kwargs)
+
+    @staticmethod
+    def loads(*args, **kwargs):
+        return loads(*args, **kwargs)
+
+
+class SocketIO(_SocketIO):
+    def __init__(self, *args, **kwargs):
+        if "json" not in kwargs:
+            kwargs["json"] = CustomJSON()
+        super().__init__(*args, **kwargs)
+
 #     def __init__(self, app=None, title: str = "SIO", version: str = "1.0.0", doc_path: str = "/doc/", **kwargs):
 #         super().__init__(app, title, version, doc_path, **kwargs)
 #

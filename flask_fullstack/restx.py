@@ -4,13 +4,13 @@ from collections.abc import Callable
 from functools import wraps
 from typing import Union, Type, Sequence
 
-from flask import jsonify, Response
+from flask import jsonify
 from flask_jwt_extended import unset_jwt_cookies, set_access_cookies, create_access_token, jwt_required
 from flask_restx import Namespace, Model as BaseModel, abort as default_abort
 from flask_restx.fields import List as ListField, Boolean as BoolField, Integer as IntegerField, Nested
 from flask_restx.marshalling import marshal
 from flask_restx.reqparse import RequestParser
-from flask_restx.utils import unpack
+from flask_restx.utils import unpack, merge
 
 from .interfaces import UserRole
 from .marshals import ResponseDoc, Model
@@ -60,11 +60,10 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
     def adds_authorization(self, auth_name: str = None):
         def adds_authorization_wrapper(function):
             @wraps(function)
-            @jwt_required(optional=True)
             def adds_authorization_inner(*args, **kwargs):
                 response, result, headers = unpack(function(*args, **kwargs))
-                if isinstance(result, UserRole):
-                    response = Response(response, 200, headers)
+                if isinstance(result, UserRole):  # TODO passthrough for headers
+                    response = jsonify(response)
                     self.add_authorization(response, result, auth_name)
                     return response
                 return response, result, headers
@@ -76,12 +75,12 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
     def removes_authorization(self, auth_name: str = None):
         def removes_authorization_wrapper(function):
             @wraps(function)
-            @jwt_required(optional=True)
+            @jwt_required()
             def removes_authorization_inner(*args, **kwargs):
                 response, code, headers = unpack(function(*args, **kwargs))
-                response = jsonify(response)
+                response = jsonify(response)  # TODO passthrough for headers & code
                 self.remove_authorization(response, auth_name)
-                return response, code, headers
+                return response
 
             return removes_authorization_inner
 
@@ -99,7 +98,8 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
             def argument_inner(*args, **kwargs):
                 kwargs.update(parser.parse_args())
                 if use_undefined:
-                    kwargs.update({args.name: Undefined for args in parser.args if args.name not in kwargs.keys()})
+                    kwargs.update({args.dest or args.name: Undefined for args in parser.args
+                                   if (args.dest or args.name) not in kwargs.keys()})
                 return function(*args, **kwargs)
 
             return argument_inner
@@ -130,7 +130,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
         return doc_responses_wrapper
 
-    def marshal_with(self, fields: BaseModel | Type[Model], as_list=False, *args, **kwargs):
+    def marshal_with(self, fields: BaseModel | Type[Model], as_list=False, skip_none=True, *args, **kwargs):
         result = super().marshal_with
 
         if isinstance(fields, type) and issubclass(fields, Model):
@@ -138,7 +138,7 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
             def marshal_with_wrapper(function: Callable) -> Callable[..., Model]:
                 @wraps(function)
-                @result(model, as_list, *args, **kwargs)
+                @result(model, as_list, *args, skip_none=skip_none, **kwargs)
                 def marshal_with_inner(*args, **kwargs):
                     if as_list:
                         return [fields.convert(d) for d in function(*args, **kwargs)]
@@ -148,16 +148,46 @@ class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
             return marshal_with_wrapper
 
-        return result(fields, as_list, *args, **kwargs)
+        return result(fields, as_list, *args, skip_none=skip_none, **kwargs)
 
-    def marshal(self, data, fields: Type[Model] | ..., *args, **kwargs):
+    def marshal(self, data, fields: Type[Model] | ..., context=None, *args, **kwargs):
         if isinstance(fields, type) and issubclass(fields, Model):
             if isinstance(data, Sequence):
-                data = [fields.convert(d) for d in data]
+                data = [fields.convert(d, **context or {}) for d in data]
             else:
-                data = fields.convert(data)
+                data = fields.convert(data, **context or {})
             fields = self.models.get(fields.name, None) or self.model(model=fields)
         return marshal(data, fields, *args, **kwargs)
+
+    def marshal_with_authorization(self, fields: BaseModel | Type[Model], as_list: bool = False,
+                                   auth_name: str = None, **kwargs):
+        model = self.models.get(fields.name, None) or self.model(model=fields)
+
+        def marshal_with_authorization_wrapper(function):
+            doc = {
+                "responses": {
+                    "200": (None, [model], kwargs)
+                    if as_list
+                    else (None, model, kwargs)
+                },
+                "__mask__": kwargs.get(
+                    "mask", True
+                ),  # Mask values can't be determined outside app context
+            }
+            function.__apidoc__ = merge(getattr(function, "__apidoc__", {}), doc)
+
+            @wraps(function)
+            def marshal_with_authorization_inner(*args, **kwargs):
+                response, result, headers = unpack(function(*args, **kwargs))
+                if isinstance(result, UserRole):  # TODO passthrough for headers
+                    response = jsonify(self.marshal(response, fields, skip_none=True, context=kwargs))
+                    self.add_authorization(response, result, auth_name)
+                    return response
+                return response, result, headers
+
+            return marshal_with_authorization_inner
+
+        return marshal_with_authorization_wrapper
 
     def lister(self, per_request: int, marshal_model: BaseModel | Type[Model], skip_none: bool = True,
                count_all: Callable[..., int] | None = None, provided_total: bool = False):
