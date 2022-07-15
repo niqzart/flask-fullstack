@@ -78,11 +78,11 @@ class EventGroup:
     def _bind_model(self, bound_model: Type[BaseModel]):
         self.bound_models.append(bound_model)
 
-    def bind_pub(self, model: Type[BaseModel], *, description: str = None,
+    def bind_pub(self, model: Type[BaseModel], ack_model: Type[BaseModel] = None, *, description: str = None,
                  name: str = None) -> Callable[[Callable], ClientEvent]:
         if self.use_kebab_case:
             name = self._kebabify(name, model)
-        event = self.ClientEvent(model, name, description)
+        event = self.ClientEvent(model, ack_model, name, description)
         self._bind_model(model)
 
         def bind_pub_wrapper(function) -> ClientEvent:
@@ -102,7 +102,8 @@ class EventGroup:
         self._bind_model(model)
         return event
 
-    def bind_dup(self, model: Type[BaseModel], server_model: Type[BaseModel] = None, *, description: str = None,
+    def bind_dup(self, model: Type[BaseModel], server_model: Type[BaseModel] = None,
+                 ack_model: Type[BaseModel] = None, *, description: str = None,
                  name: str = None, use_event: bool = False) -> Callable[[Callable], DuplexEvent]:
         if self.use_kebab_case:
             name = self._kebabify(name, model)
@@ -115,7 +116,7 @@ class EventGroup:
             self._bind_model(server_model)
 
         event = self.DuplexEvent(
-            self.ClientEvent(model, name, description),
+            self.ClientEvent(model, ack_model, name, description),
             self.ServerEvent(server_model, name, description),
             description=description)
         self._bind_model(model)

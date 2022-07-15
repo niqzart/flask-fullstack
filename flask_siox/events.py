@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import Callable
 from dataclasses import dataclass
+from functools import wraps
 from typing import Type
 
 from flask_socketio import emit
@@ -43,15 +44,39 @@ class Event(BaseEvent):  # do not instantiate!
 
 @dataclass()
 class ClientEvent(Event):
-    def __init__(self, model: Type[BaseModel], name: str = None, description: str = None, handler: Callable = None):
+    def __init__(self, model: Type[BaseModel], ack_model: Type[BaseModel] = None,
+                 name: str = None, description: str = None, handler: Callable = None,
+                 include: set[str] = None, exclude: set[str] = None, exclude_none: bool = True):
         super().__init__(model, name, description)
+        self._ack_kwargs = {
+            "exclude_none": exclude_none,
+            "include": include,
+            "exclude": exclude,
+            "by_alias": True,
+        }
         self.handler: Callable = handler
+        self.ack_model: Type[BaseModel] = ack_model
 
     def parse(self, data: dict):
         return self.model.parse_obj(data).dict()
 
+    def _handler(self, function):
+        if self.ack_model is None:
+            @wraps(function)
+            def _handler_inner(data=None):
+                return function(**self.parse(data))
+        else:
+            @wraps(function)
+            def _handler_inner(data=None):
+                result = function(**self.parse(data))
+                if not isinstance(result, self.ack_model):
+                    result = self.ack_model.parse_obj(result)
+                return result.dict(**self._ack_kwargs)
+
+        return _handler_inner
+
     def bind(self, function):
-        self.handler = lambda data=None: function(**self.parse(data))
+        self.handler = self._handler(function)
 
     def create_doc(self, namespace: str, additional_docs: dict = None):
         return {"publish": super().create_doc(namespace, additional_docs)}
@@ -94,10 +119,15 @@ class DuplexEvent(BaseEvent):
         self.description: str = description
 
     @classmethod
-    def similar(cls, model: Type[BaseModel], name: str = None, handler: Callable = None,
-                include: set[str] = None, exclude: set[str] = None, exclude_none: bool = True):
-        return cls(ClientEvent(model, handler=handler),
-                   ServerEvent(model, include=include, exclude=exclude, exclude_none=exclude_none), name)
+    def similar(cls, model: Type[BaseModel], ack_model: Type[BaseModel] = None,
+                name: str = None, description: str = None, handler: Callable = None,
+                include: set[str] = None, exclude: set[str] = None, exclude_none: bool = True,
+                ack_include: set[str] = None, ack_exclude: set[str] = None, ack_exclude_none: bool = True):
+        return cls(
+            ClientEvent(model, ack_model, name, description, handler, ack_include, ack_exclude, ack_exclude_none),
+            ServerEvent(model, name, description, include, exclude, exclude_none),
+            name, description
+        )
 
     def attach_name(self, name: str):
         self.name = name
