@@ -69,7 +69,7 @@ class EventGroup(BaseEventGroup, metaclass=ABCMeta):
     def _get_model_schema(bound_model: Type[BaseModel]):
         if issubclass(bound_model, PydanticModel):
             return {"payload": Model(EventGroup._get_model_name(bound_model), bound_model.model()).__schema__}
-        return {"payload": bound_model.schema()}
+        return super()._get_model_schema(bound_model)
 
     def abort(self, error_code: Union[int, str], description: str, *, critical: bool = False, **kwargs):
         raise EventException(error_code, description, critical)

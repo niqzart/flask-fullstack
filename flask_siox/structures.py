@@ -27,9 +27,9 @@ class BoundEvent:
 
 
 class EventGroup:
-    ClientEvent = ClientEvent
-    ServerEvent = ServerEvent
-    DuplexEvent = DuplexEvent
+    ClientEvent: Type[ClientEvent] = ClientEvent
+    ServerEvent: Type[ServerEvent] = ServerEvent
+    DuplexEvent: Type[DuplexEvent] = DuplexEvent
 
     def __init__(self, use_kebab_case: bool = False):
         self.use_kebab_case: bool = use_kebab_case
@@ -62,7 +62,7 @@ class EventGroup:
 
     @staticmethod
     def _get_model_schema(bound_model: Type[BaseModel]):
-        return {"payload": bound_model.schema()}
+        return {"payload": bound_model.schema(ref_template="#/components/messages/{model}")}
 
     def extract_doc_messages(self) -> OrderedDict[str, ...]:
         return OrderedDict((self._get_model_name(bound_model), self._get_model_schema(bound_model))
@@ -189,7 +189,7 @@ class NoPingPongFilter(Filter):
 
 
 class SocketIO(_SocketIO):
-    def __init__(self, app=None, title: str = "SIO", version: str = "1.0.0", doc_path: str = "/doc/",
+    def __init__(self, app=None, title: str = "SIO", version: str = "1.0.0", doc_path: str = "/sio-doc/",
                  remove_ping_pong_logs: bool = False, **kwargs):
         self.async_api = {"asyncapi": "2.2.0", "info": {"title": title, "version": version},
                           "channels": OrderedDict(), "components": {"messages": OrderedDict()}}
