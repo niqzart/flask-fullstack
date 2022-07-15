@@ -46,7 +46,8 @@ class Event(BaseEvent):  # do not instantiate!
 class ClientEvent(Event):
     def __init__(self, model: Type[BaseModel], ack_model: Type[BaseModel] = None,
                  name: str = None, description: str = None, handler: Callable = None,
-                 include: set[str] = None, exclude: set[str] = None, exclude_none: bool = True):
+                 include: set[str] = None, exclude: set[str] = None,
+                 force_wrap: bool = False, exclude_none: bool = True):
         super().__init__(model, name, description)
         self._ack_kwargs = {
             "exclude_none": exclude_none,
@@ -56,6 +57,7 @@ class ClientEvent(Event):
         }
         self.handler: Callable = handler
         self.ack_model: Type[BaseModel] = ack_model
+        self.force_wrap: bool = force_wrap
 
     def parse(self, data: dict):
         return self.model.parse_obj(data).dict()
@@ -64,7 +66,9 @@ class ClientEvent(Event):
         if isinstance(result, Sequence):
             result, code, message = unpack_params(self.ack_model, result, **self._ack_kwargs)
             return remove_none({"code": code, "message": message, "data": result})
-        return render_model(self.ack_model, result, **self._ack_kwargs)
+        else:
+            result = render_model(self.ack_model, result, **self._ack_kwargs)
+            return {"data": result} if self.force_wrap else result
 
     def _handler(self, function):
         if self.ack_model is None:
