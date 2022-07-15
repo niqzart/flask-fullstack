@@ -176,17 +176,20 @@ class EventSpace(metaclass=EventSpaceMeta):
 
 
 class Namespace(_Namespace):
-    def __init__(self, namespace: str = None):
+    def __init__(self, namespace: str = None, use_kebab_case: bool = False):
         super().__init__(namespace)
         self.doc_channels = OrderedDict()
         self.doc_messages = OrderedDict()
+        self.use_kebab_case = use_kebab_case
 
     def attach_event_group(self, event_group: EventGroup):
         event_group.attach_namespace(self.namespace)
         self.doc_channels.update(event_group.extract_doc_channels())
         self.doc_messages.update(event_group.extract_doc_messages())
         for name, handler in event_group.extract_handlers():
-            setattr(self, f"on_{name.replace('-', '_')}", handler)
+            if self.use_kebab_case:
+                name = name.replace("-", "_")
+            setattr(self, f"on_{name}", handler)
 
     def on_event(self, name: str):
         def on_event_wrapper(function: Callable[[...], None]):

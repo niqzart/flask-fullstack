@@ -82,8 +82,8 @@ class EventGroup(BaseEventGroup, metaclass=ABCMeta):
 
 
 class Namespace(_Namespace):
-    def __init__(self, namespace: str = None, protected: str | bool = False):
-        super().__init__(namespace)
+    def __init__(self, namespace: str = None, protected: str | bool = False, use_kebab_case: bool = False):
+        super().__init__(namespace, use_kebab_case)
         if protected is not False:
             if protected is True:
                 protected = ""
