@@ -3,12 +3,12 @@ from __future__ import annotations
 from collections import Callable
 from dataclasses import dataclass
 from functools import wraps
-from typing import Type
+from typing import Type, Sequence
 
 from flask_socketio import emit
 from pydantic import BaseModel
 
-from .utils import remove_none
+from .utils import remove_none, unpack_params, render_model
 
 
 class BaseEvent:  # do not instantiate!
@@ -60,6 +60,12 @@ class ClientEvent(Event):
     def parse(self, data: dict):
         return self.model.parse_obj(data).dict()
 
+    def _ack_response(self, result) -> dict:
+        if isinstance(result, Sequence):
+            result, code, message = unpack_params(self.ack_model, result, **self._ack_kwargs)
+            return remove_none({"code": code, "message": message, "data": result})
+        return render_model(self.ack_model, result, **self._ack_kwargs)
+
     def _handler(self, function):
         if self.ack_model is None:
             @wraps(function)
@@ -68,10 +74,7 @@ class ClientEvent(Event):
         else:
             @wraps(function)
             def _handler_inner(data=None):
-                result = function(**self.parse(data))
-                if not isinstance(result, self.ack_model):
-                    result = self.ack_model.parse_obj(result)
-                return result.dict(**self._ack_kwargs)
+                return self._ack_response(function(**self.parse(data)))
 
         return _handler_inner
 
@@ -101,9 +104,7 @@ class ServerEvent(Event):
     def emit(self, _room: str = None, _include_self: bool = True, _data: ... = None, _namespace: str = None, **kwargs):
         if _data is None:
             _data: BaseModel = self.model(**kwargs)
-        elif not isinstance(_data, self.model):
-            _data: BaseModel = self.model.parse_obj(_data)
-        return self._emit(_data.dict(**self._emit_kwargs), _namespace, _room, _include_self)
+        return self._emit(render_model(self.model, _data, **self._emit_kwargs), _namespace, _room, _include_self)
 
     def create_doc(self, namespace: str, additional_docs: dict = None):
         return {"subscribe": super().create_doc(namespace, additional_docs)}
