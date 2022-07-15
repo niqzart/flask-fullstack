@@ -37,18 +37,18 @@ class ServerEvent(_ServerEvent):
             _data = self.model.convert(_data, **kwargs)
         return super().emit(_room, _include_self, _data, _namespace, **kwargs)
 
-    def emit_convert(self, data: ..., namespace: str = None, room: str = None,
-                     include_self: bool = True, user_id: int = None,  **kwargs):
+    def emit_convert(self, data: ..., room: str = None, include_self: bool = True,
+                     user_id: int = None, namespace: str = None, **kwargs):
         if user_id is not None:
             room = f"user-{user_id}"
-        return self.emit(_data=data, _namespace=namespace, _room=room, _include_self=include_self, **kwargs)
+        return self.emit(_data=data, _room=room, _include_self=include_self, _namespace=namespace, **kwargs)
 
 
 class EventGroup(BaseEventGroup, metaclass=ABCMeta):
     ServerEvent = ServerEvent
 
-    def __init__(self, sessionmaker: Sessionmaker, use_kebab_case: bool = False):
-        super().__init__(use_kebab_case)
+    def __init__(self, sessionmaker: Sessionmaker, namespace: str = None, use_kebab_case: bool = False):
+        super().__init__(namespace, use_kebab_case)
         self.sessionmaker = sessionmaker
 
     def with_begin(self, function):
@@ -82,7 +82,7 @@ class EventGroup(BaseEventGroup, metaclass=ABCMeta):
 
 
 class Namespace(_Namespace):
-    def __init__(self, namespace=None, protected: str | bool = False):
+    def __init__(self, namespace: str = None, protected: str | bool = False):
         super().__init__(namespace)
         if protected is not False:
             if protected is True:

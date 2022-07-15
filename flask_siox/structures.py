@@ -31,10 +31,11 @@ class EventGroup:
     ServerEvent: Type[ServerEvent] = ServerEvent
     DuplexEvent: Type[DuplexEvent] = DuplexEvent
 
-    def __init__(self, use_kebab_case: bool = False):
+    def __init__(self, namespace: str = None, use_kebab_case: bool = False):
         self.use_kebab_case: bool = use_kebab_case
         self.bound_events: list[BoundEvent] = []
         self.bound_models: list[Type[BaseModel]] = []
+        self.namespace: str | None = namespace
 
     @staticmethod
     def _kebabify(name: str | None, model: Type[BaseModel]) -> str | None:
@@ -48,9 +49,8 @@ class EventGroup:
             return bound_event.event.name.replace("_", "-")
         return bound_event.event.name
 
-    @staticmethod
-    def _get_model_reference(bound_event: BoundEvent, namespace: str = None):
-        return bound_event.event.create_doc(namespace or "/", bound_event.additional_docs)
+    def _get_model_reference(self, bound_event: BoundEvent, namespace: str = None):
+        return bound_event.event.create_doc(namespace or self.namespace or "/", bound_event.additional_docs)
 
     def extract_doc_channels(self, namespace: str = None) -> OrderedDict[str, ...]:
         return OrderedDict((self._get_event_name(bound_event), self._get_model_reference(bound_event, namespace))
@@ -79,6 +79,8 @@ class EventGroup:
         self.bound_models.append(bound_model)
 
     def bind_pub_full(self, event: ClientEvent) -> Callable[[Callable], ClientEvent]:
+        if self.namespace is not None:
+            event.attach_namespace(self.namespace)
         kebabify_model(event.model)
         self._bind_model(event.model)
 
@@ -98,6 +100,8 @@ class EventGroup:
         return self.bind_pub_full(self.ClientEvent(model, ack_model, name, description))
 
     def bind_sub_full(self, event: ServerEvent) -> ServerEvent:
+        if self.namespace is not None:
+            event.attach_namespace(self.namespace)
         kebabify_model(event.model)
         self._bind_event(BoundEvent(event, event.model))
         self._bind_model(event.model)
@@ -110,6 +114,8 @@ class EventGroup:
 
     def bind_dup_full(self, event: DuplexEvent, same_model: bool = True,
                       use_event: bool = False) -> Callable[[Callable], DuplexEvent]:
+        if self.namespace is not None:
+            event.attach_namespace(self.namespace)
         kebabify_model(event.client_event.model)
         kebabify_model(event.server_event.model)
         self._bind_model(event.client_event.model)
@@ -151,6 +157,11 @@ class EventGroup:
         )
         return self.bind_dup_full(event, same_model, use_event)
 
+    def attach_namespace(self, namespace: str):
+        self.namespace = namespace
+        for event in self.bound_events:
+            event.event.attach_namespace(namespace)
+
 
 class EventSpaceMeta(type):
     def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, ...]):
@@ -165,12 +176,13 @@ class EventSpace(metaclass=EventSpaceMeta):
 
 
 class Namespace(_Namespace):
-    def __init__(self, namespace=None):
+    def __init__(self, namespace: str = None):
         super().__init__(namespace)
         self.doc_channels = OrderedDict()
         self.doc_messages = OrderedDict()
 
     def attach_event_group(self, event_group: EventGroup):
+        event_group.attach_namespace(self.namespace)
         self.doc_channels.update(event_group.extract_doc_channels())
         self.doc_messages.update(event_group.extract_doc_messages())
         for name, handler in event_group.extract_handlers():
