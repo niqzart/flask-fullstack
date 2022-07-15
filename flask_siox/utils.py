@@ -30,3 +30,7 @@ def unpack_params(model: Type[BaseModel], result: Sequence, **kwargs) -> tuple[d
         result, code, message = result
 
     return render_model(model, result, **kwargs), code, message
+
+
+def render_packed(data: dict | str | int | None = None, code: int | None = None, message: str | None = None) -> dict:
+    return remove_none({"code": code, "message": message, "data": data})

@@ -17,7 +17,7 @@ from .mixins import DatabaseSearcherMixin, JWTAuthorizerMixin
 from .sqlalchemy import Sessionmaker
 from .utils import Nameable, TypeEnum
 from ..flask_siox import (Namespace as _Namespace, EventGroup as _EventGroup,
-                          ServerEvent as _ServerEvent, SocketIO as _SocketIO)
+                          ServerEvent as _ServerEvent, SocketIO as _SocketIO, render_packed)
 
 
 class BaseEventGroup(_EventGroup, DatabaseSearcherMixin, JWTAuthorizerMixin, metaclass=ABCMeta):
@@ -36,6 +36,12 @@ class ServerEvent(_ServerEvent):
         if issubclass(self.model, PydanticModel) and _data is not None:
             _data = self.model.convert(_data, **kwargs)
         return super().emit(_room, _include_self, _data, _namespace, **kwargs)
+
+    def emit_convert(self, data: ..., namespace: str = None, room: str = None,
+                     include_self: bool = True, user_id: int = None,  **kwargs):
+        if user_id is not None:
+            room = f"user-{user_id}"
+        return self.emit(_data=data, _namespace=namespace, _room=room, _include_self=include_self, **kwargs)
 
 
 class EventGroup(BaseEventGroup, metaclass=ABCMeta):
@@ -90,16 +96,16 @@ class Namespace(_Namespace):
                     raise ConnectionRefusedError("unauthorized!")
                 join_room(f"user-{user_id}")
 
-    def handle_exception(self, exception: EventException):
-        pass
+    def handle_exception(self, exception: EventException) -> dict | None:
+        return render_packed(code=exception.code, message=exception.message)
 
     def trigger_event(self, event, *args):
         try:
             return super().trigger_event(event.replace("-", "_"), *args)
         except EventException as e:
-            self.handle_exception(e)
             if e.critical:
                 disconnect()
+            return self.handle_exception(e)
 
 
 class CustomJSON:

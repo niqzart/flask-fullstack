@@ -8,7 +8,7 @@ from typing import Type, Sequence
 from flask_socketio import emit
 from pydantic import BaseModel
 
-from .utils import remove_none, unpack_params, render_model
+from .utils import remove_none, unpack_params, render_model, render_packed
 
 
 class BaseEvent:  # do not instantiate!
@@ -64,8 +64,7 @@ class ClientEvent(Event):
 
     def _ack_response(self, result) -> dict:
         if isinstance(result, Sequence):
-            result, code, message = unpack_params(self.ack_model, result, **self._ack_kwargs)
-            return remove_none({"code": code, "message": message, "data": result})
+            return render_packed(*unpack_params(self.ack_model, result, **self._ack_kwargs))
         else:
             result = render_model(self.ack_model, result, **self._ack_kwargs)
             return {"data": result} if self.force_wrap else result
