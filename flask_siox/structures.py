@@ -78,37 +78,66 @@ class EventGroup:
     def _bind_model(self, bound_model: Type[BaseModel]):
         self.bound_models.append(bound_model)
 
-    def bind_pub(self, model: Type[BaseModel], ack_model: Type[BaseModel] = None, *, description: str = None,
-                 name: str = None) -> Callable[[Callable], ClientEvent]:
-        if self.use_kebab_case:
-            name = self._kebabify(name, model)
-        event = self.ClientEvent(model, ack_model, name, description)
-        self._bind_model(model)
+    def bind_pub_full(self, event: ClientEvent) -> Callable[[Callable], ClientEvent]:
+        kebabify_model(event.model)
+        self._bind_model(event.model)
 
         def bind_pub_wrapper(function) -> ClientEvent:
             def handler(data=None):
-                return function(None, **model.parse_obj(data).dict())  # TODO temp, pass self or smth
+                return function(None, **event.model.parse_obj(data).dict())  # TODO temp, pass self or smth
 
-            self._bind_event(BoundEvent(event, model, handler, getattr(function, "__sio_doc__", None)))
+            self._bind_event(BoundEvent(event, event.model, handler, getattr(function, "__sio_doc__", None)))
             return event
 
         return bind_pub_wrapper
 
-    def bind_sub(self, model: Type[BaseModel], *, description: str = None, name: str = None) -> ServerEvent:
-        if self.use_kebab_case:
-            name = self._kebabify(name, model)
-        event = self.ServerEvent(model, name, description)
-        self._bind_event(BoundEvent(event, model))
-        self._bind_model(model)
+    def bind_pub(self, model: Type[BaseModel], ack_model: Type[BaseModel] = None, *, description: str = None,
+                 name: str = None) -> Callable[[Callable], ClientEvent]:
+        if self.use_kebab_case and name is not None:
+            name = name.replace("_", "-")
+        return self.bind_pub_full(self.ClientEvent(model, ack_model, name, description))
+
+    def bind_sub_full(self, event: ServerEvent) -> ServerEvent:
+        kebabify_model(event.model)
+        self._bind_event(BoundEvent(event, event.model))
+        self._bind_model(event.model)
         return event
+
+    def bind_sub(self, model: Type[BaseModel], *, description: str = None, name: str = None) -> ServerEvent:
+        if self.use_kebab_case and name is not None:
+            name = name.replace("_", "-")
+        return self.bind_sub_full(self.ServerEvent(model, name, description))
+
+    def bind_dup_full(self, event: DuplexEvent, same_model: bool = True,
+                      use_event: bool = False) -> Callable[[Callable], DuplexEvent]:
+        kebabify_model(event.client_event.model)
+        kebabify_model(event.server_event.model)
+        self._bind_model(event.client_event.model)
+        if not same_model:
+            self._bind_model(event.server_event.model)
+
+        def bind_dup_wrapper(function) -> DuplexEvent:
+            def handler(*args):
+                data = args[-1]
+                args = list(args)  # TODO accurate is: list(args[:-1])
+                if use_event:
+                    args.append(event)
+                return function(*args, **event.client_event.model.parse_obj(data).dict())
+
+            self._bind_event(BoundEvent(event, event.client_event.model,
+                                        handler, getattr(function, "__sio_doc__", None)))
+            return event
+
+        return bind_dup_wrapper
 
     def bind_dup(self, model: Type[BaseModel], server_model: Type[BaseModel] = None,
                  ack_model: Type[BaseModel] = None, *, description: str = None,
                  name: str = None, use_event: bool = False) -> Callable[[Callable], DuplexEvent]:
-        if self.use_kebab_case:
-            name = self._kebabify(name, model)
+        if self.use_kebab_case and name is not None:
+            name = name.replace("_", "-")
 
-        if server_model is None:
+        same_model: bool = server_model is None
+        if same_model:
             server_model = model
         else:
             if self.use_kebab_case:
@@ -118,21 +147,9 @@ class EventGroup:
         event = self.DuplexEvent(
             self.ClientEvent(model, ack_model, name, description),
             self.ServerEvent(server_model, name, description),
-            description=description)
-        self._bind_model(model)
-
-        def bind_dup_wrapper(function) -> DuplexEvent:
-            def handler(*args):
-                data = args[-1]
-                args = list(args)  # TODO accurate is: list(args[:-1])
-                if use_event:
-                    args.append(event)
-                return function(*args, **model.parse_obj(data).dict())
-
-            self._bind_event(BoundEvent(event, model, handler, getattr(function, "__sio_doc__", None)))
-            return event
-
-        return bind_dup_wrapper
+            description=description
+        )
+        return self.bind_dup_full(event, same_model, use_event)
 
 
 class EventSpaceMeta(type):
