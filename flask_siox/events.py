@@ -127,12 +127,12 @@ class DuplexEvent(BaseEvent):
     def similar(cls, model: Type[BaseModel], ack_model: Type[BaseModel] = None,
                 name: str = None, description: str = None, handler: Callable = None,
                 include: set[str] = None, exclude: set[str] = None, exclude_none: bool = True,
-                ack_include: set[str] = None, ack_exclude: set[str] = None, ack_exclude_none: bool = True):
-        return cls(
-            ClientEvent(model, ack_model, name, description, handler, ack_include, ack_exclude, ack_exclude_none),
-            ServerEvent(model, name, description, include, exclude, exclude_none),
-            name, description
-        )
+                ack_include: set[str] = None, ack_exclude: set[str] = None,
+                ack_exclude_none: bool = True, ack_force_wrap: bool = False):
+        return cls(ClientEvent(model, ack_model, name, description, handler,
+                               ack_include, ack_exclude, ack_exclude_none, ack_force_wrap),
+                   ServerEvent(model, name, description, include, exclude, exclude_none),
+                   name, description)
 
     def attach_name(self, name: str):
         self.name = name
