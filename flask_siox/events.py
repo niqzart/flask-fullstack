@@ -29,8 +29,8 @@ class BaseEvent:  # do not instantiate!
 
 
 class Event(BaseEvent):  # do not instantiate!
-    def __init__(self, model: Type[BaseModel], name: str = None, description: str = None):
-        super().__init__(name)
+    def __init__(self, model: Type[BaseModel], namespace: str = None, name: str = None, description: str = None):
+        super().__init__(name, namespace)
         self.model: Type[BaseModel] = model
         self.description: str = description
 
@@ -56,17 +56,17 @@ class ClientEvent(Event):
     def __init__(self, model: Type[BaseModel], ack_model: Type[BaseModel] = None, namespace: str = None,
                  name: str = None, description: str = None, handler: Callable = None,
                  include: set[str] = None, exclude: set[str] = None,
-                 force_wrap: bool = False, exclude_none: bool = True):
-        super().__init__(model, name, description)
+                 force_wrap: bool = None, exclude_none: bool = None):
+        super().__init__(model, namespace, name, description)
         self._ack_kwargs = {
-            "exclude_none": exclude_none,
+            "exclude_none": exclude_none is not False,
             "include": include,
             "exclude": exclude,
             "by_alias": True,
         }
         self.handler: Callable = handler
         self.ack_model: Type[BaseModel] = ack_model
-        self.force_wrap: bool = force_wrap
+        self.force_wrap: bool = force_wrap is True
 
     def parse(self, data: dict):
         return self.model.parse_obj(data).dict()
@@ -100,10 +100,10 @@ class ClientEvent(Event):
 @dataclass()
 class ServerEvent(Event):
     def __init__(self, model: Type[BaseModel], namespace: str = None, name: str = None, description: str = None,
-                 include: set[str] = None, exclude: set[str] = None, exclude_none: bool = True):
-        super().__init__(model, name, description)
+                 include: set[str] = None, exclude: set[str] = None, exclude_none: bool = None):
+        super().__init__(model, namespace, name, description)
         self._emit_kwargs = {
-            "exclude_none": exclude_none,
+            "exclude_none": exclude_none is not False,
             "include": include,
             "exclude": exclude,
             "by_alias": True,
@@ -125,8 +125,8 @@ class ServerEvent(Event):
 @dataclass()
 class DuplexEvent(BaseEvent):
     def __init__(self, client_event: ClientEvent = None, server_event: ServerEvent = None,
-                 name: str = None, description: str = None):
-        super().__init__(name)
+                 namespace: str = None, name: str = None, description: str = None):
+        super().__init__(name, namespace)
         self.client_event: ClientEvent = client_event
         self.server_event: ServerEvent = server_event
         self.description: str = description
