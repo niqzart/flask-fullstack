@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from dataclasses import dataclass
 from logging import Filter, getLogger
-from typing import Callable
+from typing import Callable, Type
 
 from flask_socketio import Namespace as _Namespace, SocketIO as _SocketIO, disconnect
 
@@ -24,15 +24,6 @@ class Namespace(_Namespace):
         self.doc_channels = OrderedDict()
         self.doc_messages = OrderedDict()
         self.use_kebab_case = use_kebab_case
-
-    def attach_event_group(self, event_group: EventGroupBase):
-        event_group.attach_namespace(self.namespace)
-        self.doc_channels.update(event_group.extract_doc_channels())
-        self.doc_messages.update(event_group.extract_doc_messages())
-        for name, handler in event_group.extract_handlers():
-            if self.use_kebab_case:
-                name = name.replace("-", "_")
-            setattr(self, f"on_{name}", handler)
 
     def on_event(self, name: str):
         def on_event_wrapper(function: Callable[[...], None]):
@@ -58,6 +49,15 @@ class Namespace(_Namespace):
 
         setattr(self, f"on_disconnect", function)
 
+    def attach_event_group(self, event_group: EventGroupBase):
+        event_group.attach_namespace(self.namespace)
+        self.doc_channels.update(event_group.extract_doc_channels())
+        self.doc_messages.update(event_group.extract_doc_messages())
+        for name, handler in event_group.extract_handlers():
+            if self.use_kebab_case:
+                name = name.replace("-", "_")
+            self.on_event(name)(handler)
+
     def handle_exception(self, exception: EventException) -> dict | None:
         return render_packed(code=exception.code, message=exception.message)
 
@@ -76,8 +76,14 @@ class NoPingPongFilter(Filter):
 
 
 class SocketIO(_SocketIO):
+    default_namespace_class: Type[Namespace] = Namespace
+
     def __init__(self, app=None, title: str = "SIO", version: str = "1.0.0", doc_path: str = "/sio-doc/",
-                 remove_ping_pong_logs: bool = False, **kwargs):
+                 remove_ping_pong_logs: bool = False, use_kebab_case: bool = False,
+                 namespace_class: Type[Namespace] = default_namespace_class, **kwargs):
+        self.use_kebab_case = use_kebab_case
+        self.namespace_class = namespace_class
+
         self.async_api = {"asyncapi": "2.2.0", "info": {"title": title, "version": version},
                           "channels": OrderedDict(), "components": {"messages": OrderedDict()}}
         self.doc_path = doc_path
@@ -102,3 +108,11 @@ class SocketIO(_SocketIO):
             self.async_api["channels"].update(namespace_handler.doc_channels)
             self.async_api["components"]["messages"].update(namespace_handler.doc_messages)
         return super(SocketIO, self).on_namespace(namespace_handler)
+
+    def _add_namespace(self, namespace: Namespace, *event_groups: EventGroupBase):
+        for event_group in event_groups:
+            namespace.attach_event_group(event_group)
+        self.on_namespace(namespace)
+
+    def add_namespace(self, name: str = None, *event_groups: EventGroupBase, **kwargs):
+        self._add_namespace(self.namespace_class(name, self.use_kebab_case), *event_groups)

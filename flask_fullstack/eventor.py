@@ -16,7 +16,7 @@ from .mixins import DatabaseSearcherMixin, JWTAuthorizerMixin
 from .sqlalchemy import Sessionmaker
 from .utils import Nameable, TypeEnum
 from ..flask_siox import (Namespace as _Namespace, EventGroup as _EventGroup,
-                          ServerEvent as _ServerEvent, SocketIO as _SocketIO, EventException)
+                          ServerEvent as _ServerEvent, SocketIO as _SocketIO, EventException, EventGroupBase)
 
 
 class EventGroupMixedIn(_EventGroup, DatabaseSearcherMixin, JWTAuthorizerMixin, metaclass=ABCMeta):
@@ -76,6 +76,9 @@ class EventGroup(EventGroupMixedIn, metaclass=ABCMeta):
 class Namespace(_Namespace):
     def __init__(self, namespace: str = None, protected: str | bool = False, use_kebab_case: bool = False):
         super().__init__(namespace, use_kebab_case)
+        self.mark_protected(protected)
+
+    def mark_protected(self, protected: str | bool = False):
         if protected is not False:
             if protected is True:
                 protected = ""
@@ -108,10 +111,18 @@ class CustomJSON:
 
 
 class SocketIO(_SocketIO):
+    default_namespace_class = Namespace
+
     def __init__(self, *args, **kwargs):
         if "json" not in kwargs:
             kwargs["json"] = CustomJSON()
         super().__init__(*args, **kwargs)
+
+    def add_namespace(self, name: str = None, *event_groups: EventGroupBase, protected: str | bool = False):
+        namespace = self.namespace_class(name, self.use_kebab_case)
+        if isinstance(namespace, Namespace):
+            namespace.mark_protected(protected)
+        self._add_namespace(namespace, *event_groups)
 
 #     def __init__(self, app=None, title: str = "SIO", version: str = "1.0.0", doc_path: str = "/doc/", **kwargs):
 #         super().__init__(app, title, version, doc_path, **kwargs)
