@@ -22,12 +22,10 @@ class EventGroupBase:
     def _bind_event(self, event: BaseEvent):
         self.bound_events.append(event)
 
-    @staticmethod
-    def _get_model_name(bound_model: Type[BaseModel]):
+    def _get_model_name(self, bound_model: Type[BaseModel]):
         return bound_model.__name__
 
-    @staticmethod
-    def _get_model_schema(bound_model: Type[BaseModel]):
+    def _get_model_schema(self, bound_model: Type[BaseModel]):
         return {"payload": bound_model.schema(ref_template="#/components/messages/{model}")}
 
     def _bind_model(self, bound_model: Type[BaseModel]):

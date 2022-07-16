@@ -75,12 +75,15 @@ class ClientEvent(Event):
     def parse(self, data: dict):
         return self.model.parse_obj(data).dict()
 
+    def _force_wrap(self, result) -> dict:
+        return {"data": result}
+
     def _ack_response(self, result) -> dict:
         if isinstance(result, Sequence):
             return render_packed(*unpack_params(self.ack_model, result, **self._ack_kwargs))
         else:
             result = render_model(self.ack_model, result, **self._ack_kwargs)
-            return {"data": result} if self.force_wrap else result
+            return self._force_wrap(result) if self.force_wrap else result
 
     def _handler(self, function: Callable[..., dict]):
         if self.ack_model is None:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABCMeta
 from datetime import datetime
 from json import dumps, loads
-from typing import Union, Type
+from typing import Union, Type, Callable
 
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_restx import Model
@@ -15,12 +15,25 @@ from .marshals import PydanticModel
 from .mixins import DatabaseSearcherMixin, JWTAuthorizerMixin
 from .sqlalchemy import Sessionmaker
 from .utils import Nameable, TypeEnum
-from ..flask_siox import (Namespace as _Namespace, EventGroup as _EventGroup,
-                          ServerEvent as _ServerEvent, SocketIO as _SocketIO, EventException, EventGroupBase)
+from ..flask_siox import (ClientEvent as _ClientEvent, ServerEvent as _ServerEvent, EventGroupBase as _EventGroupBase,
+                          EventGroup as _EventGroup, EventController as _EventController,
+                          Namespace as _Namespace, SocketIO as _SocketIO, EventException)
 
 
-class EventGroupMixedIn(_EventGroup, DatabaseSearcherMixin, JWTAuthorizerMixin, metaclass=ABCMeta):
+class EventGroupBaseMixedIn(_EventGroupBase, DatabaseSearcherMixin, JWTAuthorizerMixin, metaclass=ABCMeta):
     pass
+
+
+class ClientEvent(_ClientEvent):
+    def __init__(self, model: Type[BaseModel], ack_model: Type[BaseModel] = None, namespace: str = None,
+                 name: str = None, description: str = None, handler: Callable = None,
+                 include: set[str] = None, exclude: set[str] = None, force_wrap: bool = None,
+                 exclude_none: bool = None, additional_docs: dict = None):
+        super().__init__(model, ack_model, namespace, name, description, handler,
+                         include, exclude, force_wrap is not False, exclude_none, additional_docs)
+
+    def _force_wrap(self, result) -> dict:
+        return {"data": result, "code": 200}
 
 
 class ServerEvent(_ServerEvent):
@@ -36,7 +49,8 @@ class ServerEvent(_ServerEvent):
         return self.emit(_data=data, _room=room, _include_self=include_self, _namespace=namespace, **kwargs)
 
 
-class EventGroup(EventGroupMixedIn, metaclass=ABCMeta):
+class EventGroupBase(EventGroupBaseMixedIn):
+    ClientEvent = ClientEvent
     ServerEvent = ServerEvent
 
     def __init__(self, sessionmaker: Sessionmaker, namespace: str = None, use_kebab_case: bool = False):
@@ -57,20 +71,26 @@ class EventGroup(EventGroupMixedIn, metaclass=ABCMeta):
 
         return doc_abort_wrapper
 
-    @staticmethod
-    def _get_model_name(bound_model: Type[BaseModel]):
+    def _get_model_name(self, bound_model: Type[BaseModel]):
         if isinstance(bound_model, type) and issubclass(bound_model, Nameable):
             return bound_model.name or bound_model.__name__
-        return bound_model.__name__
+        return super()._get_model_name(bound_model)
 
-    @staticmethod
-    def _get_model_schema(bound_model: Type[BaseModel]):
+    def _get_model_schema(self, bound_model: Type[BaseModel]):
         if issubclass(bound_model, PydanticModel):
-            return {"payload": Model(EventGroup._get_model_name(bound_model), bound_model.model()).__schema__}
+            return {"payload": Model(self._get_model_name(bound_model), bound_model.model()).__schema__}
         return super()._get_model_schema(bound_model)
 
     def abort(self, error_code: Union[int, str], description: str, *, critical: bool = False, **kwargs):
         raise EventException(error_code, description, critical)
+
+
+class EventGroup(_EventGroup, EventGroupBase):
+    pass
+
+
+class EventController(_EventController, EventGroupBase):
+    pass
 
 
 class Namespace(_Namespace):
