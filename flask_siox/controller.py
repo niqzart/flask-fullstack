@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import wraps
 from typing import Type, Callable
 
 from pydantic import BaseModel
@@ -52,14 +53,16 @@ class EventController(EventGroupBase):
 
             ack_kwargs = {n: event_data.get(v, None) for n, v in self.ack_kwarg_names.items()}
             client_event = self.ClientEvent(client_model, event_data.get("ack_model", None), **ack_kwargs)
-            client_event.bind(function)
 
             if event_data.get("duplex", False):
                 server_kwargs = {n: event_data.get(n, None) for n in self.model_kwarg_names}
                 server_event = self.ServerEvent(event_data.get("server_model", client_model), **server_kwargs)
-                return self.DuplexEvent(client_event, server_event, event_data.get("use_event", None),
-                                        additional_docs=additional_docs)
+                duplex_event = self.DuplexEvent(client_event, server_event, event_data.get("use_event", None),
+                                                additional_docs=additional_docs)
+                duplex_event.bind(function)
+                return duplex_event
 
+            client_event.bind(function)
             client_event.additional_docs = additional_docs
             return client_event
 
@@ -98,10 +101,22 @@ class EventController(EventGroupBase):
 
         return marshal_ack_wrapper
 
+    def with_cls(self, cls: type, function: Callable):
+        @wraps(function)
+        def with_cls_inner(*args, **kwargs):
+            return function(cls, *args, **kwargs)
+
+        return with_cls_inner
+
     def route(self, cls: type | None = None) -> type:  # TODO mb move data pre- and post-processing from modes to here
         def route_inner(cls: type) -> type:
             for name, value in cls.__dict__.items():
                 if isinstance(value, BaseEvent):
+                    if isinstance(value, ClientEvent):
+                        value.handler = self.with_cls(cls, value.handler)
+                    elif isinstance(value, DuplexEvent):
+                        value.client_event.handler = self.with_cls(cls, value.client_event.handler)
+
                     if value.name is None:
                         value.attach_name(name.replace("_", "-") if self.use_kebab_case else name)
                     if self.namespace is not None:

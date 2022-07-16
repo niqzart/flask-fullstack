@@ -35,6 +35,13 @@ class ClientEvent(_ClientEvent):
     def _force_wrap(self, result) -> dict:
         return {"data": result, "code": 200}
 
+    def parse(self, data=None) -> dict:
+        if data is None:
+            return {}
+        if isinstance(self.model, PydanticModel):
+            return self.model.deconvert(data).dict()
+        return super().parse(data)
+
 
 class ServerEvent(_ServerEvent):
     def emit(self, _room: str = None, _include_self: bool = True, _data: ... = None, _namespace: str = None, **kwargs):

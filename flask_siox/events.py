@@ -88,17 +88,20 @@ class ClientEvent(Event):
     def _handler(self, function: Callable[..., dict]):
         if self.ack_model is None:
             @wraps(function)
-            def _handler_inner(data=None):
-                return function(**self.parse(data))
+            def _handler_inner(*args, **kwargs):
+                return function(*args, **kwargs)
         else:
             @wraps(function)
-            def _handler_inner(data=None):
-                return self._ack_response(function(**self.parse(data)))
+            def _handler_inner(*args, **kwargs):
+                return self._ack_response(function(*args, **kwargs))
 
         return _handler_inner
 
     def bind(self, function):
         self.handler = self._handler(function)
+
+    def __call__(self, data=None):
+        return self.handler(**self.parse(data))
 
     def attach_ack(self, ack_model: Type[BaseModel], include: set[str] = None, exclude: set[str] = None,
                    force_wrap: bool = None, exclude_none: bool = None) -> None:
@@ -111,7 +114,7 @@ class ClientEvent(Event):
         self.ack_model: Type[BaseModel] = ack_model
         self.force_wrap: bool = force_wrap is True
         if self.handler is not None:
-            self.handler = lambda data=None: self._ack_response(self.handler)
+            self.handler = lambda *args, **kwargs: self._ack_response(self.handler(*args, **kwargs))
 
     def create_doc(self, namespace: str = None, additional_docs: dict = None):
         return {"publish": super().create_doc(namespace, additional_docs)}
@@ -185,6 +188,9 @@ class DuplexEvent(BaseEvent):
 
             return self.client_event.bind(duplex_handler)
         return self.client_event.bind(function)
+
+    def __call__(self, data=None):
+        return self.client_event(data)
 
     def create_doc(self, namespace: str = None, additional_docs: dict = None):
         if additional_docs is None:

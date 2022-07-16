@@ -49,9 +49,9 @@ class EventGroupBase:
     def extract_handlers(self) -> Iterable[tuple[str, Callable]]:
         for event in self.bound_events:
             if isinstance(event, ClientEvent):
-                yield event.name, event.handler
+                yield event.name, event
             elif isinstance(event, DuplexEvent):
-                yield event.client_event.name, event.client_event.handler
+                yield event.client_event.name, event.client_event
 
     def attach_namespace(self, namespace: str):
         for event in self.bound_events:
