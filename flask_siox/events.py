@@ -48,7 +48,7 @@ class Event(BaseEvent):  # do not instantiate!
             namespace = self.namespace
         return remove_none(
             {"description": self.description,
-             "tags": [{"name": f"namespace-{namespace}"}] if namespace is not None else [],
+             "tags": [{"name": f"namespace-{namespace}"}] if namespace is not None else None,
              "message": {"$ref": f"#/components/messages/{model_name}"}},
             **(self.additional_docs or {}),
             **(additional_docs or {}),
@@ -123,8 +123,32 @@ class ClientEvent(Event):
         if self.handler is not None:
             self.handler = lambda *args, **kwargs: self._ack_response(self.handler(*args, **kwargs))
 
+    def ack_model_doc(self):
+        if self.forced_ack:
+            data = {"type": ["boolean", "integer", "string"]}
+        else:
+            model_name: str = getattr(self.ack_model, "name", None) or self.ack_model.__name__
+            data = {"$ref": f"#/components/messages/{model_name}/payload"}
+        return {
+            "name": self.name + "-ack",
+            "payload": {
+                "type": "object",
+                "required": ["code"] if self.forced_ack else ["code", "data"],
+                "properties": {
+                    "code": {"type": "integer"},
+                    "message": {"type": "string"},
+                    "data": data
+                }
+            }
+        }
+
     def create_doc(self, namespace: str = None, additional_docs: dict = None):
-        return {"publish": super().create_doc(namespace, additional_docs)}
+        result = super().create_doc(namespace, additional_docs)
+
+        if self.ack_model or self.forced_ack:
+            result["message"] = {"oneOf": [result["message"], self.ack_model_doc()]}
+
+        return {"publish": result}
 
 
 @dataclass()
