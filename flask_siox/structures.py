@@ -114,7 +114,9 @@ class EventGroup:
         return self.bind_sub_full(self.ServerEvent(model, name, description))
 
     def bind_dup_full(self, event: DuplexEvent, same_model: bool = True,
-                      use_event: bool = False) -> Callable[[Callable], DuplexEvent]:
+                      use_event: bool = None) -> Callable[[Callable], DuplexEvent]:
+        if use_event is None:
+            use_event = False
         if self.namespace is not None:
             event.attach_namespace(self.namespace)
         kebabify_model(event.client_event.model)
@@ -139,7 +141,7 @@ class EventGroup:
 
     def bind_dup(self, model: Type[BaseModel], server_model: Type[BaseModel] = None,
                  ack_model: Type[BaseModel] = None, *, description: str = None,
-                 name: str = None, use_event: bool = False) -> Callable[[Callable], DuplexEvent]:
+                 name: str = None, use_event: bool = None) -> Callable[[Callable], DuplexEvent]:
         if self.use_kebab_case and name is not None:
             name = name.replace("_", "-")
 
@@ -186,13 +188,13 @@ class EventGroup:
     model_kwarg_names = ("include", "exclude", "exclude_none")
     ack_kwarg_names = {n: "ack_" + n for n in model_kwarg_names + ("force_wrap",)}
 
-    def mark_duplex(self, server_model: Type[BaseModel] = None, include: set[str] = None,
-                    exclude: set[str] = None, exclude_none: bool = True) -> Callable[[Callable], Callable]:
-        return self.updates_event_data(server_model=server_model, duplex=True,
+    def mark_duplex(self, server_model: Type[BaseModel] = None, use_event: bool = None, include: set[str] = None,
+                    exclude: set[str] = None, exclude_none: bool = None) -> Callable[[Callable], Callable]:
+        return self.updates_event_data(server_model=server_model, duplex=True, use_event=use_event,
                                        include=include, exclude=exclude, exclude_none=exclude_none)
 
     def marshal_ack(self, ack_model: Type[BaseModel], include: set[str] = None, exclude: set[str] = None,
-                    force_wrap: bool = False, exclude_none: bool = True) -> Callable[[Callable], Callable]:
+                    force_wrap: bool = None, exclude_none: bool = None) -> Callable[[Callable], Callable]:
         # TODO replace defaults with None
         return self.updates_event_data(ack_model=ack_model, ack_include=include, ack_exclude=exclude,
                                        ack_force_wrap=force_wrap, ack_exclude_none=exclude_none)
@@ -217,11 +219,16 @@ class EventGroup:
                     if event_data is None:
                         continue
                     value = self.render_event_data(event_data)
-
-                if isinstance(value, BaseEvent) and value.name is None:
                     value.attach_name(name.replace("_", "-") if self.use_kebab_case else name)
-                    if self.namespace is not None:
-                        value.attach_namespace(self.namespace)
+                    if isinstance(value, DuplexEvent):
+                        self.bind_dup_full(value, "server_model" not in event_data, event_data.get("use_event"))
+                    else:
+                        self.bind_pub_full(value)
+
+                elif isinstance(value, ServerEvent):
+                    if value.name is None:
+                        value.attach_name(name.replace("_", "-") if self.use_kebab_case else name)
+                    self.bind_sub_full(value)
 
                 setattr(cls, name, value)
 
@@ -273,10 +280,6 @@ class Namespace(_Namespace):
             return on_disconnect_wrapper
 
         setattr(self, f"on_disconnect", function)
-
-    def attach_event_space(self, cls: Type[EventSpace]):
-        cls.event_group.attach_namespace(self.namespace)
-        return cls
 
 
 class NoPingPongFilter(Filter):
