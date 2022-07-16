@@ -54,8 +54,6 @@ class Namespace(_Namespace):
         self.doc_channels.update(event_group.extract_doc_channels())
         self.doc_messages.update(event_group.extract_doc_messages())
         for name, handler in event_group.extract_handlers():
-            if self.use_kebab_case:
-                name = name.replace("-", "_")
             self.on_event(name)(handler)
 
     def handle_exception(self, exception: EventException) -> dict | None:
@@ -63,7 +61,7 @@ class Namespace(_Namespace):
 
     def trigger_event(self, event, *args):
         try:
-            return super().trigger_event(event.replace("-", "_"), *args)
+            return super().trigger_event(event, *args)
         except EventException as e:
             if e.critical:
                 disconnect()

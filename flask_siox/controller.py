@@ -71,11 +71,11 @@ class EventController(EventGroupBase):
     def mark_duplex(self, server_model: Type[BaseModel] = None, use_event: bool = None,
                     include: set[str] = None, exclude: set[str] = None, exclude_none: bool = None):
         self._maybe_bind_model(server_model)
+        server_kwargs = {"include": include, "exclude": exclude,
+                         "exclude_none": exclude_none, "use_event": use_event}
 
         # TODO clearly label: Callable -> Callable & ClientEvent -> DuplexEvent
         def mark_duplex_wrapper(value: Callable | ClientEvent) -> Callable | DuplexEvent:
-            server_kwargs = {"include": include, "exclude": exclude,
-                             "exclude_none": exclude_none, "use_event": use_event}
             if isinstance(value, ClientEvent):
                 server_event = self.ServerEvent(server_model, **server_kwargs)
                 return self.DuplexEvent(value, server_event)
@@ -83,21 +83,17 @@ class EventController(EventGroupBase):
 
         return mark_duplex_wrapper
 
+    def _marshal_ack_wrapper(self, ack_model: Type[BaseModel], ack_kwargs: dict, function: Callable) -> Callable:
+        return self._update_event_data(function, dict(ack_kwargs, ack_model=ack_model))
+
     def marshal_ack(self, ack_model: Type[BaseModel], include: set[str] = None, exclude: set[str] = None,
                     force_wrap: bool = None, exclude_none: bool = None):
         self._maybe_bind_model(ack_model)
+        ack_kwargs = {"ack_include": include, "ack_exclude": exclude,
+                      "ack_exclude_none": exclude_none, "ack_force_wrap": force_wrap}
 
-        # TODO clearly label: Callable -> Callable & ClientEvent -> ClientEvent & DuplexEvent -> DuplexEvent
-        def marshal_ack_wrapper(value: Callable | ClientEvent | DuplexEvent) -> Callable | ClientEvent | DuplexEvent:
-            if isinstance(value, DuplexEvent):
-                value.client_event.attach_ack(ack_model, include, exclude, force_wrap, exclude_none)
-            elif isinstance(value, ClientEvent):
-                value.attach_ack(ack_model, include, exclude, force_wrap, exclude_none)
-            else:
-                ack_kwargs = {"ack_include": include, "ack_exclude": exclude,
-                              "ack_exclude_none": exclude_none, "ack_force_wrap": force_wrap}
-                value = self._update_event_data(value, ack_kwargs)
-            return value
+        def marshal_ack_wrapper(function: Callable) -> Callable:
+            return self._marshal_ack_wrapper(ack_model, ack_kwargs, function)
 
         return marshal_ack_wrapper
 

@@ -10,10 +10,9 @@ def remove_none(data: dict, **kwargs):
 
 
 def render_model(model: Type[BaseModel], data, **kwargs) -> dict:
-    result: BaseModel
     if not isinstance(data, model):
-        result = model.parse_obj(data)
-    return result.dict(**kwargs)
+        data = model.parse_obj(data)
+    return data.dict(**kwargs)
 
 
 def unpack_params(model: Type[BaseModel], result: Sequence, **kwargs) -> tuple[dict, int | None, str | None]:

@@ -38,14 +38,14 @@ class ClientEvent(_ClientEvent):
     def parse(self, data=None) -> dict:
         if data is None:
             return {}
-        if isinstance(self.model, PydanticModel):
+        if isinstance(self.model, type) and issubclass(self.model, PydanticModel):
             return self.model.deconvert(data).dict()
         return super().parse(data)
 
 
 class ServerEvent(_ServerEvent):
     def emit(self, _room: str = None, _include_self: bool = True, _data: ... = None, _namespace: str = None, **kwargs):
-        if issubclass(self.model, PydanticModel) and _data is not None:
+        if isinstance(self.model, type) and issubclass(self.model, PydanticModel) and _data is not None:
             _data = self.model.convert(_data, **kwargs)
         return super().emit(_room, _include_self, _data, _namespace, **kwargs)
 
@@ -79,7 +79,7 @@ class EventGroupBase(EventGroupBaseMixedIn):
         return self.sessionmaker.with_begin(function)
 
     def _bind_model(self, bound_model: Type[BaseModel]):
-        if issubclass(bound_model, PydanticModel):
+        if isinstance(bound_model, type) and issubclass(bound_model, PydanticModel):
             bound_model.Config.title = bound_model.name
         super()._bind_model(bound_model)
 
@@ -95,7 +95,7 @@ class EventGroupBase(EventGroupBaseMixedIn):
         return super()._get_model_name(bound_model)
 
     def _get_model_schema(self, bound_model: Type[BaseModel]):
-        if issubclass(bound_model, PydanticModel):
+        if isinstance(bound_model, type) and issubclass(bound_model, PydanticModel):
             return {"payload": Model(self._get_model_name(bound_model), bound_model.model()).__schema__}
         return super()._get_model_schema(bound_model)
 
