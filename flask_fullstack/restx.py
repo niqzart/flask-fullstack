@@ -20,7 +20,7 @@ from .sqlalchemy import Sessionmaker
 Undefined = object()
 
 
-class RestXNamespace(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
+class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
     """
     Expansion of :class:`Namespace`, which adds decorators for methods of :class:`Resource`.
 
