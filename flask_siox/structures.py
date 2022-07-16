@@ -187,16 +187,31 @@ class EventGroup:
         return self.updates_event_data(server_model=server_model, duplex=True)
 
     def marshal_ack(self, ack_model: Type[BaseModel]) -> Callable[[Callable], Callable]:
+        # TODO ack parameters + replace defaults with None
         return self.updates_event_data(ack_model=ack_model)
 
-    def route(self, cls: type | None = None) -> type:
+    def render_event_data(self, event_data: dict) -> ClientEvent | DuplexEvent:
+        client_model = event_data.get("model", BaseModel)
+        client_event = self.ClientEvent(client_model, event_data.get("ack_model", None))
+
+        if event_data.get("duplex", False):
+            return self.DuplexEvent(client_event, self.ServerEvent(event_data.get("server_model", client_model)))
+
+        return client_event
+
+    def route(self, cls: type | None = None) -> type:  # TODO mb move data pre- and post-processing from modes to here
         def route_inner(cls: type) -> type:
             for name, value in cls.__dict__.items():
                 if callable(value):
-                    pass
+                    event_data: dict = getattr(value, "__event_data__", None)
+                    if event_data is None:
+                        continue
+                    value = self.render_event_data(event_data)
 
                 if isinstance(value, BaseEvent) and value.name is None:
                     value.attach_name(name.replace("_", "-") if self.use_kebab_case else name)
+                    if self.namespace is not None:
+                        value.attach_namespace(self.namespace)
 
                 setattr(cls, name, value)
 
