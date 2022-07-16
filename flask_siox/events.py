@@ -64,7 +64,7 @@ class ClientEvent(Event):
             "exclude": exclude,
             "by_alias": True,
         }
-        self.handler: Callable = handler
+        self.handler: Callable[[dict | None], dict] = handler
         self.ack_model: Type[BaseModel] = ack_model
         self.force_wrap: bool = force_wrap is True
 
@@ -78,7 +78,7 @@ class ClientEvent(Event):
             result = render_model(self.ack_model, result, **self._ack_kwargs)
             return {"data": result} if self.force_wrap else result
 
-    def _handler(self, function):
+    def _handler(self, function: Callable[..., dict]):
         if self.ack_model is None:
             @wraps(function)
             def _handler_inner(data=None):
@@ -169,7 +169,7 @@ class DuplexEvent(BaseEvent):
     def emit(self, _room: str = None, _include_self: bool = True, _data: ... = None, _namespace: str = None, **kwargs):
         return self.server_event.emit(_room, _include_self, _data, _namespace, **kwargs)
 
-    def bind(self, function):
+    def bind(self, function: Callable[..., dict]):
         if self.use_event:
             @wraps(function)
             def duplex_handler(*args, **kwargs):

@@ -5,7 +5,8 @@ from typing import Type, Callable
 from pydantic import BaseModel
 
 from .events import ClientEvent, ServerEvent, DuplexEvent, BaseEvent
-from .groups import EventGroup
+from .groups import EventGroup, BoundEvent
+from .utils import kebabify_model
 
 
 class EventController(EventGroup):
@@ -20,7 +21,16 @@ class EventController(EventGroup):
             function.__event_data__ = data
         return function
 
+    def _maybe_bind_model(self, model: Type[BaseModel] | None = None) -> None:
+        if model is None:
+            return
+        if self.use_kebab_case:
+            kebabify_model(model)
+        self._bind_model(model)
+
     def argument_parser(self, client_model: Type[BaseModel] = BaseModel):
+        self._maybe_bind_model(client_model)
+
         def argument_parser_wrapper(function: Callable) -> ClientEvent | DuplexEvent:
             event_data: dict = getattr(function, "__event_data__", {})
             ack_kwargs = {n: event_data.get(v, None) for n, v in self.ack_kwarg_names.items()}
@@ -38,6 +48,8 @@ class EventController(EventGroup):
 
     def mark_duplex(self, server_model: Type[BaseModel] = None, use_event: bool = None,
                     include: set[str] = None, exclude: set[str] = None, exclude_none: bool = None):
+        self._maybe_bind_model(server_model)
+
         # TODO clearly label: Callable -> Callable & ClientEvent -> DuplexEvent
         def mark_duplex_wrapper(value: Callable | ClientEvent) -> Callable | DuplexEvent:
             server_kwargs = {"include": include, "exclude": exclude,
@@ -51,6 +63,8 @@ class EventController(EventGroup):
 
     def marshal_ack(self, ack_model: Type[BaseModel], include: set[str] = None, exclude: set[str] = None,
                     force_wrap: bool = None, exclude_none: bool = None):
+        self._maybe_bind_model(ack_model)
+
         # TODO clearly label: Callable -> Callable & ClientEvent -> ClientEvent & DuplexEvent -> DuplexEvent
         def marshal_ack_wrapper(value: Callable | ClientEvent | DuplexEvent) -> Callable | ClientEvent | DuplexEvent:
             if isinstance(value, DuplexEvent):
@@ -68,15 +82,19 @@ class EventController(EventGroup):
     def route(self, cls: type | None = None) -> type:  # TODO mb move data pre- and post-processing from modes to here
         def route_inner(cls: type) -> type:
             for name, value in cls.__dict__.items():
-                if isinstance(value, BaseEvent) and value.name is None:
-                    value.attach_name(name.replace("_", "-") if self.use_kebab_case else name)
+                if isinstance(value, BaseEvent):
+                    if value.name is None:
+                        value.attach_name(name.replace("_", "-") if self.use_kebab_case else name)
+                    if self.namespace is not None:
+                        value.attach_namespace(self.namespace)
 
                 if isinstance(value, DuplexEvent):
-                    self.bind_dup_full(value)  # "server_model" not in event_data, event_data.get("use_event"))
+                    self._bind_event(BoundEvent(value, value.client_event.model,
+                                                value.client_event.handler, getattr(value.client_event.handler, "__sio_doc__", None)))
                 elif isinstance(value, ClientEvent):
-                    self.bind_pub_full(value)
+                    self._bind_event(BoundEvent(value, value.model, value.handler, getattr(value.handler, "__sio_doc__", None)))
                 elif isinstance(value, ServerEvent):
-                    self.bind_sub_full(value)
+                    self._bind_event(BoundEvent(value, value.model))
 
                 setattr(cls, name, value)
 
