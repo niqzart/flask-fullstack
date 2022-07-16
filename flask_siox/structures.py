@@ -10,7 +10,6 @@ from flask_socketio import Namespace as _Namespace, SocketIO as _SocketIO
 from pydantic import BaseModel
 
 from .events import ClientEvent, ServerEvent, DuplexEvent, BaseEvent
-from .utils import remove_none
 
 
 def kebabify_model(model: Type[BaseModel]):
@@ -86,8 +85,8 @@ class EventGroup:
         self._bind_model(event.model)
 
         def bind_pub_wrapper(function) -> ClientEvent:
-            def handler(data=None):
-                return function(None, **event.model.parse_obj(data).dict())  # TODO temp, pass self or smth
+            def handler(*args, data=None, **kwargs):
+                return function(*args, **event.model.parse_obj(data).dict(), **kwargs)
 
             self._bind_event(BoundEvent(event, event.model, handler, getattr(function, "__sio_doc__", None)))
             return event
@@ -126,12 +125,12 @@ class EventGroup:
             self._bind_model(event.server_event.model)
 
         def bind_dup_wrapper(function) -> DuplexEvent:
-            def handler(*args):
+            def handler(*args, **kwargs):
                 data = args[-1]
-                args = list(args)  # TODO accurate is: list(args[:-1])
+                args = list(args[:-1])
                 if use_event:
                     args.append(event)
-                return function(*args, **event.client_event.model.parse_obj(data).dict())
+                return function(*args, **event.client_event.model.parse_obj(data).dict(), **kwargs)
 
             self._bind_event(BoundEvent(event, event.client_event.model,
                                         handler, getattr(function, "__sio_doc__", None)))
@@ -165,69 +164,72 @@ class EventGroup:
         for event in self.bound_events:
             event.event.attach_namespace(namespace)
 
+    model_kwarg_names = ("include", "exclude", "exclude_none")
+    ack_kwarg_names = {n: "ack_" + n for n in model_kwarg_names + ("force_wrap",)}
+
     @staticmethod
-    def update_event_data(function: Callable, data: dict) -> Callable:
+    def _update_event_data(function: Callable, data: dict) -> Callable:
         if hasattr(function, "__event_data__"):
             function.__event_data__.update(data)
         else:
             function.__event_data__ = data
         return function
 
-    @staticmethod
-    def updates_event_data(**data) -> Callable[[Callable], Callable]:
-        data = remove_none(data)
+    def argument_parser(self, client_model: Type[BaseModel] = BaseModel):
+        def argument_parser_wrapper(function: Callable) -> ClientEvent | DuplexEvent:
+            event_data: dict = getattr(function, "__event_data__", {})
+            ack_kwargs = {n: event_data.get(v, None) for n, v in self.ack_kwarg_names.items()}
+            client_event = self.ClientEvent(client_model, event_data.get("ack_model", None), **ack_kwargs)
+            client_event.bind(function)
 
-        def updates_event_data_inner(function):
-            return EventGroup.update_event_data(function, data)
+            if event_data.get("duplex", False):
+                server_model = event_data.get("server_model", client_model)
+                server_kwargs = {n: event_data.get(n, None) for n in self.model_kwarg_names}
+                return self.DuplexEvent(client_event, self.ServerEvent(server_model, **server_kwargs))
 
-        return updates_event_data_inner
+            return client_event
 
-    def argument_parser(self, model: Type[BaseModel]) -> Callable[[Callable], Callable]:
-        return self.updates_event_data(model=model)
+        return argument_parser_wrapper
 
-    model_kwarg_names = ("include", "exclude", "exclude_none")
-    ack_kwarg_names = {n: "ack_" + n for n in model_kwarg_names + ("force_wrap",)}
+    def mark_duplex(self, server_model: Type[BaseModel] = None, use_event: bool = None,
+                    include: set[str] = None, exclude: set[str] = None, exclude_none: bool = None):
+        # TODO clearly label: Callable -> Callable & ClientEvent -> DuplexEvent
+        def mark_duplex_wrapper(value: Callable | ClientEvent) -> Callable | DuplexEvent:
+            server_kwargs = {"include": include, "exclude": exclude, "exclude_none": exclude_none}
+            if isinstance(value, ClientEvent):
+                server_event = self.ServerEvent(server_model, **server_kwargs)
+                return self.DuplexEvent(value, server_event)
+            return self._update_event_data(value, dict(server_kwargs, duplex=True, server_model=server_model))
 
-    def mark_duplex(self, server_model: Type[BaseModel] = None, use_event: bool = None, include: set[str] = None,
-                    exclude: set[str] = None, exclude_none: bool = None) -> Callable[[Callable], Callable]:
-        return self.updates_event_data(server_model=server_model, duplex=True, use_event=use_event,
-                                       include=include, exclude=exclude, exclude_none=exclude_none)
+        return mark_duplex_wrapper
 
     def marshal_ack(self, ack_model: Type[BaseModel], include: set[str] = None, exclude: set[str] = None,
-                    force_wrap: bool = None, exclude_none: bool = None) -> Callable[[Callable], Callable]:
-        # TODO replace defaults with None
-        return self.updates_event_data(ack_model=ack_model, ack_include=include, ack_exclude=exclude,
-                                       ack_force_wrap=force_wrap, ack_exclude_none=exclude_none)
+                    force_wrap: bool = None, exclude_none: bool = None):
+        # TODO clearly label: Callable -> Callable & ClientEvent -> ClientEvent & DuplexEvent -> DuplexEvent
+        def marshal_ack_wrapper(value: Callable | ClientEvent | DuplexEvent) -> Callable | ClientEvent | DuplexEvent:
+            if isinstance(value, DuplexEvent):
+                value.client_event.attach_ack(ack_model, include, exclude, force_wrap, exclude_none)
+            elif isinstance(value, ClientEvent):
+                value.attach_ack(ack_model, include, exclude, force_wrap, exclude_none)
+            else:
+                ack_kwargs = {"ack_include": include, "ack_exclude": exclude,
+                              "ack_exclude_none": exclude_none, "ack_force_wrap": force_wrap}
+                value = self._update_event_data(value, ack_kwargs)
+            return value
 
-    def render_event_data(self, event_data: dict) -> ClientEvent | DuplexEvent:
-        client_model = event_data.get("model", BaseModel)
-        ack_kwargs = {n: event_data.get(v, None) for n, v in self.ack_kwarg_names.items()}
-        client_event = self.ClientEvent(client_model, event_data.get("ack_model", None), **ack_kwargs)
-
-        if event_data.get("duplex", False):
-            server_model = event_data.get("server_model", client_model)
-            server_kwargs = {n: event_data.get(n, None) for n in self.model_kwarg_names}
-            return self.DuplexEvent(client_event, self.ServerEvent(server_model, **server_kwargs))
-
-        return client_event
+        return marshal_ack_wrapper
 
     def route(self, cls: type | None = None) -> type:  # TODO mb move data pre- and post-processing from modes to here
         def route_inner(cls: type) -> type:
             for name, value in cls.__dict__.items():
-                if callable(value):
-                    event_data: dict = getattr(value, "__event_data__", None)
-                    if event_data is None:
-                        continue
-                    value = self.render_event_data(event_data)
+                if isinstance(value, BaseEvent) and value.name is None:
                     value.attach_name(name.replace("_", "-") if self.use_kebab_case else name)
-                    if isinstance(value, DuplexEvent):
-                        self.bind_dup_full(value, "server_model" not in event_data, event_data.get("use_event"))
-                    else:
-                        self.bind_pub_full(value)
 
+                if isinstance(value, DuplexEvent):
+                    self.bind_dup_full(value)  # "server_model" not in event_data, event_data.get("use_event"))
+                elif isinstance(value, ClientEvent):
+                    self.bind_pub_full(value)
                 elif isinstance(value, ServerEvent):
-                    if value.name is None:
-                        value.attach_name(name.replace("_", "-") if self.use_kebab_case else name)
                     self.bind_sub_full(value)
 
                 setattr(cls, name, value)

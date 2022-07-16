@@ -93,6 +93,19 @@ class ClientEvent(Event):
     def bind(self, function):
         self.handler = self._handler(function)
 
+    def attach_ack(self, ack_model: Type[BaseModel], include: set[str] = None, exclude: set[str] = None,
+                   force_wrap: bool = None, exclude_none: bool = None) -> None:
+        self._ack_kwargs = {
+            "exclude_none": exclude_none is not False,
+            "include": include,
+            "exclude": exclude,
+            "by_alias": True,
+        }
+        self.ack_model: Type[BaseModel] = ack_model
+        self.force_wrap: bool = force_wrap is True
+        if self.handler is not None:
+            self.handler = lambda data=None: self._ack_response(self.handler)
+
     def create_doc(self, namespace: str = None, additional_docs: dict = None):
         return {"publish": super().create_doc(namespace, additional_docs)}
 
