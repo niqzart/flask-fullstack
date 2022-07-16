@@ -10,7 +10,7 @@ def remove_none(data: dict, **kwargs):
 
 
 def render_model(model: Type[BaseModel], data, **kwargs) -> dict:
-    result: Type[BaseModel]
+    result: BaseModel
     if not isinstance(data, model):
         result = model.parse_obj(data)
     return result.dict(**kwargs)

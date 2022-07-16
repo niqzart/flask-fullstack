@@ -10,6 +10,7 @@ from flask_socketio import Namespace as _Namespace, SocketIO as _SocketIO
 from pydantic import BaseModel
 
 from .events import ClientEvent, ServerEvent, DuplexEvent, BaseEvent
+from .utils import remove_none
 
 
 def kebabify_model(model: Type[BaseModel]):
@@ -162,6 +163,32 @@ class EventGroup:
         for event in self.bound_events:
             event.event.attach_namespace(namespace)
 
+    @staticmethod
+    def update_event_data(function: Callable, data: dict) -> Callable:
+        if hasattr(function, "__event_data__"):
+            function.__event_data__.update(data)
+        else:
+            function.__event_data__ = data
+        return function
+
+    @staticmethod
+    def updates_event_data(**data) -> Callable[[Callable], Callable]:
+        data = remove_none(data)
+
+        def updates_event_data_inner(function):
+            return EventGroup.update_event_data(function, data)
+
+        return updates_event_data_inner
+
+    def argument_parser(self, model: Type[BaseModel]) -> Callable[[Callable], Callable]:
+        return self.updates_event_data(model=model)
+
+    def mark_duplex(self, server_model: Type[BaseModel] = None) -> Callable[[Callable], Callable]:
+        return self.updates_event_data(server_model=server_model, duplex=True)
+
+    def marshal_ack(self, ack_model: Type[BaseModel]) -> Callable[[Callable], Callable]:
+        return self.updates_event_data(ack_model=ack_model)
+
 
 class EventSpaceMeta(type):
     def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, ...]):
@@ -214,6 +241,10 @@ class Namespace(_Namespace):
             return on_disconnect_wrapper
 
         setattr(self, f"on_disconnect", function)
+
+    def attach_event_space(self, cls: Type[EventSpace]):
+        cls.event_group.attach_namespace(self.namespace)
+        return cls
 
 
 class NoPingPongFilter(Filter):
