@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABCMeta
 from datetime import datetime
+from functools import wraps
 from json import dumps, loads
 from typing import Union, Type, Callable
 
@@ -108,7 +109,20 @@ class EventGroup(_EventGroup, EventGroupBase):  # DEPRECATED
 
 
 class EventController(_EventController, EventGroupBase):
-    pass
+    def _marshal_ack_wrapper(self, ack_model: Type[BaseModel], ack_kwargs: dict, function: Callable) -> Callable:
+        if isinstance(ack_model, type) and issubclass(ack_model, PydanticModel):
+            model: Type[PydanticModel] = ack_model
+
+            @wraps(function)
+            def marshal_ack_inner(*args, **kwargs):
+                result = function(*args, **kwargs)
+                if not isinstance(result, ack_model):
+                    result = model.convert(result, **kwargs)
+                return result
+        else:
+            marshal_ack_inner = function
+
+        return super()._marshal_ack_wrapper(ack_model, ack_kwargs, marshal_ack_inner)
 
 
 class Namespace(_Namespace):
