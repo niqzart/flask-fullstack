@@ -1,12 +1,21 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from typing import Callable
+from dataclasses import dataclass
 from logging import Filter, getLogger
+from typing import Callable
 
-from flask_socketio import Namespace as _Namespace, SocketIO as _SocketIO
+from flask_socketio import Namespace as _Namespace, SocketIO as _SocketIO, disconnect
 
 from .interfaces import EventGroupBase
+from .utils import render_packed
+
+
+@dataclass
+class EventException(Exception):
+    code: int
+    message: str
+    critical: bool = False
 
 
 class Namespace(_Namespace):
@@ -48,6 +57,17 @@ class Namespace(_Namespace):
             return on_disconnect_wrapper
 
         setattr(self, f"on_disconnect", function)
+
+    def handle_exception(self, exception: EventException) -> dict | None:
+        return render_packed(code=exception.code, message=exception.message)
+
+    def trigger_event(self, event, *args):
+        try:
+            return super().trigger_event(event.replace("-", "_"), *args)
+        except EventException as e:
+            if e.critical:
+                disconnect()
+            return self.handle_exception(e)
 
 
 class NoPingPongFilter(Filter):

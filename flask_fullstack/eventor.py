@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 from abc import ABCMeta
-from dataclasses import dataclass
 from datetime import datetime
 from json import dumps, loads
 from typing import Union, Type
 
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_restx import Model
-from flask_socketio import disconnect, join_room
+from flask_socketio import join_room
 from pydantic import BaseModel
 from socketio.exceptions import ConnectionRefusedError
 
@@ -17,18 +16,11 @@ from .mixins import DatabaseSearcherMixin, JWTAuthorizerMixin
 from .sqlalchemy import Sessionmaker
 from .utils import Nameable, TypeEnum
 from ..flask_siox import (Namespace as _Namespace, EventGroup as _EventGroup,
-                          ServerEvent as _ServerEvent, SocketIO as _SocketIO, render_packed)
+                          ServerEvent as _ServerEvent, SocketIO as _SocketIO, EventException)
 
 
-class BaseEventGroup(_EventGroup, DatabaseSearcherMixin, JWTAuthorizerMixin, metaclass=ABCMeta):
+class EventGroupMixedIn(_EventGroup, DatabaseSearcherMixin, JWTAuthorizerMixin, metaclass=ABCMeta):
     pass
-
-
-@dataclass
-class EventException(Exception):
-    code: int
-    message: str
-    critical: bool = False
 
 
 class ServerEvent(_ServerEvent):
@@ -44,7 +36,7 @@ class ServerEvent(_ServerEvent):
         return self.emit(_data=data, _room=room, _include_self=include_self, _namespace=namespace, **kwargs)
 
 
-class EventGroup(BaseEventGroup, metaclass=ABCMeta):
+class EventGroup(EventGroupMixedIn, metaclass=ABCMeta):
     ServerEvent = ServerEvent
 
     def __init__(self, sessionmaker: Sessionmaker, namespace: str = None, use_kebab_case: bool = False):
@@ -95,17 +87,6 @@ class Namespace(_Namespace):
                 if identity is None or (user_id := identity.get(protected, None)) is None:
                     raise ConnectionRefusedError("unauthorized!")
                 join_room(f"user-{user_id}")
-
-    def handle_exception(self, exception: EventException) -> dict | None:
-        return render_packed(code=exception.code, message=exception.message)
-
-    def trigger_event(self, event, *args):
-        try:
-            return super().trigger_event(event.replace("-", "_"), *args)
-        except EventException as e:
-            if e.critical:
-                disconnect()
-            return self.handle_exception(e)
 
 
 class CustomJSON:
