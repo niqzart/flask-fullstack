@@ -34,3 +34,9 @@ def unpack_params(model: Type[BaseModel], result: Sequence, **kwargs) -> tuple[d
 
 def render_packed(data: dict | str | int | None = None, code: int | None = None, message: str | None = None) -> dict:
     return remove_none({"code": code, "message": message, "data": data})
+
+
+def kebabify_model(model: Type[BaseModel]):
+    for f_name, field in model.__fields__.items():
+        if field.alias == f_name:
+            field.alias = field.name.replace("_", "-")
