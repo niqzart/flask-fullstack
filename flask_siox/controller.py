@@ -28,9 +28,9 @@ class EventController(EventGroup):
             client_event.bind(function)
 
             if event_data.get("duplex", False):
-                server_model = event_data.get("server_model", client_model)
                 server_kwargs = {n: event_data.get(n, None) for n in self.model_kwarg_names}
-                return self.DuplexEvent(client_event, self.ServerEvent(server_model, **server_kwargs))
+                server_event = self.ServerEvent(event_data.get("server_model", client_model), **server_kwargs)
+                return self.DuplexEvent(client_event, server_event, event_data.get("use_event", None))
 
             return client_event
 
@@ -40,7 +40,8 @@ class EventController(EventGroup):
                     include: set[str] = None, exclude: set[str] = None, exclude_none: bool = None):
         # TODO clearly label: Callable -> Callable & ClientEvent -> DuplexEvent
         def mark_duplex_wrapper(value: Callable | ClientEvent) -> Callable | DuplexEvent:
-            server_kwargs = {"include": include, "exclude": exclude, "exclude_none": exclude_none}
+            server_kwargs = {"include": include, "exclude": exclude,
+                             "exclude_none": exclude_none, "use_event": use_event}
             if isinstance(value, ClientEvent):
                 server_event = self.ServerEvent(server_model, **server_kwargs)
                 return self.DuplexEvent(value, server_event)

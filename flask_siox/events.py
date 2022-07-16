@@ -137,15 +137,16 @@ class ServerEvent(Event):
 
 @dataclass()
 class DuplexEvent(BaseEvent):
-    def __init__(self, client_event: ClientEvent = None, server_event: ServerEvent = None,
+    def __init__(self, client_event: ClientEvent = None, server_event: ServerEvent = None, use_event: bool = None,
                  namespace: str = None, name: str = None, description: str = None):
         super().__init__(name, namespace)
         self.client_event: ClientEvent = client_event
         self.server_event: ServerEvent = server_event
         self.description: str = description
+        self.use_event: bool = bool(use_event)
 
     @classmethod
-    def similar(cls, model: Type[BaseModel], ack_model: Type[BaseModel] = None,
+    def similar(cls, model: Type[BaseModel], ack_model: Type[BaseModel] = None, use_event: bool = None,
                 name: str = None, description: str = None, namespace: str = None, handler: Callable = None,
                 include: set[str] = None, exclude: set[str] = None, exclude_none: bool = True,
                 ack_include: set[str] = None, ack_exclude: set[str] = None,
@@ -153,7 +154,7 @@ class DuplexEvent(BaseEvent):
         return cls(ClientEvent(model, ack_model, namespace, name, description, handler,
                                ack_include, ack_exclude, ack_exclude_none, ack_force_wrap),
                    ServerEvent(model, name, namespace, description, include, exclude, exclude_none),
-                   name, description)
+                   use_event, namespace, name, description)
 
     def attach_name(self, name: str):
         self.name = name
@@ -161,6 +162,7 @@ class DuplexEvent(BaseEvent):
         self.server_event.name = name
 
     def attach_namespace(self, namespace: str):
+        self.namespace = namespace
         self.client_event.namespace = namespace
         self.server_event.namespace = namespace
 
@@ -168,6 +170,11 @@ class DuplexEvent(BaseEvent):
         return self.server_event.emit(_room, _include_self, _data, _namespace, **kwargs)
 
     def bind(self, function):
+        if self.use_event:
+            @wraps(function)
+            def duplex_handler(*args, **kwargs):
+                return function(*args, event=self, **kwargs)
+            return self.client_event.bind(duplex_handler)
         return self.client_event.bind(function)
 
     def create_doc(self, namespace: str = None, additional_docs: dict = None):
