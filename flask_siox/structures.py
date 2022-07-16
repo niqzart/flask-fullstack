@@ -189,16 +189,23 @@ class EventGroup:
     def marshal_ack(self, ack_model: Type[BaseModel]) -> Callable[[Callable], Callable]:
         return self.updates_event_data(ack_model=ack_model)
 
+    def route(self, cls: type | None = None) -> type:
+        def route_inner(cls: type) -> type:
+            for name, value in cls.__dict__.items():
+                if callable(value):
+                    pass
 
-class EventSpaceMeta(type):
-    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, ...]):
-        for name, value in namespace.items():
-            if isinstance(value, BaseEvent) and value.name is None:
-                value.attach_name(name.replace("_", "-"))
-        super().__init__(name, bases, namespace)
+                if isinstance(value, BaseEvent) and value.name is None:
+                    value.attach_name(name.replace("_", "-") if self.use_kebab_case else name)
+
+                setattr(cls, name, value)
+
+            return cls
+
+        return route_inner if cls is None else route_inner(cls)
 
 
-class EventSpace(metaclass=EventSpaceMeta):
+class EventSpace:
     pass
 
 
