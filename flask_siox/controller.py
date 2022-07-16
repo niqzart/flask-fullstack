@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from collections import OrderedDict
-from typing import Type, Callable, Iterable
+from typing import Type, Callable
 
 from pydantic import BaseModel
 
@@ -11,32 +10,6 @@ from .utils import kebabify_model
 
 
 class EventController(EventGroupBase):
-    def __init__(self, namespace: str = None, use_kebab_case: bool = False):
-        super().__init__(namespace, use_kebab_case)
-        self.bound_events: list[BaseEvent] = []
-
-    def _get_event_name(self, event: BaseEvent):
-        if self.use_kebab_case:
-            return event.name.replace("_", "-")
-        return event.name
-
-    def _create_doc(self, event: BaseEvent):
-        return event.create_doc(self.namespace or "/")  # , event.additional_docs)
-
-    def extract_doc_channels(self) -> OrderedDict[str, ...]:
-        return OrderedDict((self._get_event_name(event), self._create_doc(event)) for event in self.bound_events)
-
-    def extract_handlers(self) -> Iterable[tuple[str, Callable]]:
-        for event in self.bound_events:
-            if isinstance(event, ClientEvent):
-                yield event.name, event.handler
-            elif isinstance(event, DuplexEvent):
-                yield event.client_event.name, event.client_event.handler
-
-    def attach_namespace(self, namespace: str):
-        for event in self.bound_events:
-            event.attach_namespace(namespace)
-
     model_kwarg_names = ("include", "exclude", "exclude_none")
     ack_kwarg_names = {n: "ack_" + n for n in model_kwarg_names + ("force_wrap",)}
 
@@ -133,7 +106,7 @@ class EventController(EventGroupBase):
                         value.attach_name(name.replace("_", "-") if self.use_kebab_case else name)
                     if self.namespace is not None:
                         value.attach_namespace(self.namespace)
-                    self.bound_events.append(value)
+                    self._bind_event(value)
 
                 setattr(cls, name, value)
 

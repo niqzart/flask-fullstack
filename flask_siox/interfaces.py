@@ -5,7 +5,7 @@ from typing import Type, Iterable, Callable
 
 from pydantic import BaseModel
 
-from .events import ClientEvent, ServerEvent, DuplexEvent
+from .events import BaseEvent, ClientEvent, ServerEvent, DuplexEvent
 
 
 class EventGroupBase:
@@ -17,6 +17,10 @@ class EventGroupBase:
         self.use_kebab_case: bool = use_kebab_case
         self.namespace: str | None = namespace
         self.bound_models: list[Type[BaseModel]] = []
+        self.bound_events: list[BaseEvent] = []
+
+    def _bind_event(self, event: BaseEvent):
+        self.bound_events.append(event)
 
     @staticmethod
     def _get_model_name(bound_model: Type[BaseModel]):
@@ -33,11 +37,24 @@ class EventGroupBase:
         return OrderedDict((self._get_model_name(bound_model), self._get_model_schema(bound_model))
                            for bound_model in self.bound_models)
 
+    def _get_event_name(self, event: BaseEvent):
+        if self.use_kebab_case:
+            return event.name.replace("_", "-")
+        return event.name
+
+    def _create_doc(self, event: BaseEvent):
+        return event.create_doc(self.namespace or "/")
+
     def extract_doc_channels(self) -> OrderedDict[str, ...]:
-        raise NotImplementedError()
+        return OrderedDict((self._get_event_name(event), self._create_doc(event)) for event in self.bound_events)
 
     def extract_handlers(self) -> Iterable[tuple[str, Callable]]:
-        raise NotImplementedError()
+        for event in self.bound_events:
+            if isinstance(event, ClientEvent):
+                yield event.name, event.handler
+            elif isinstance(event, DuplexEvent):
+                yield event.client_event.name, event.client_event.handler
 
     def attach_namespace(self, namespace: str):
-        raise NotImplementedError()
+        for event in self.bound_events:
+            event.attach_namespace(namespace)

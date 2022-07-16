@@ -1,54 +1,21 @@
 from __future__ import annotations
 
-from collections import OrderedDict
-from dataclasses import dataclass
-from typing import Type, Iterable, Callable
+from typing import Type, Callable
 
 from pydantic import BaseModel
 
-from .events import ClientEvent, ServerEvent, DuplexEvent, BaseEvent
+from .events import ClientEvent, ServerEvent, DuplexEvent
 from .interfaces import EventGroupBase
 from .utils import kebabify_model
 
 
-@dataclass
-class BoundEvent:
-    event: BaseEvent
-    model: Type[BaseModel]
-    handler: Callable = None
-    additional_docs: dict = None
-
-
 class EventGroup(EventGroupBase):
-    def __init__(self, namespace: str = None, use_kebab_case: bool = False):
-        super().__init__(namespace, use_kebab_case)
-        self.bound_events: list[BoundEvent] = []
-
     @staticmethod
     def _kebabify(name: str | None, model: Type[BaseModel]) -> str | None:
         kebabify_model(model)
         if name is None:
             return None
         return name.replace("_", "-")
-
-    def _get_event_name(self, bound_event: BoundEvent):
-        if self.use_kebab_case:
-            return bound_event.event.name.replace("_", "-")
-        return bound_event.event.name
-
-    def _get_model_reference(self, bound_event: BoundEvent, namespace: str = None):
-        return bound_event.event.create_doc(namespace or self.namespace or "/", bound_event.additional_docs)
-
-    def extract_doc_channels(self, namespace: str = None) -> OrderedDict[str, ...]:
-        return OrderedDict((self._get_event_name(bound_event), self._get_model_reference(bound_event, namespace))
-                           for bound_event in self.bound_events)
-
-    def extract_handlers(self) -> Iterable[tuple[str, Callable]]:
-        for bound_event in self.bound_events:
-            yield bound_event.event.name, bound_event.handler
-
-    def _bind_event(self, bound_event: BoundEvent):
-        self.bound_events.append(bound_event)
 
     def bind_pub_full(self, event: ClientEvent) -> Callable[[Callable], ClientEvent]:
         if self.namespace is not None:
@@ -60,7 +27,8 @@ class EventGroup(EventGroupBase):
             def handler(*args, data=None, **kwargs):
                 return function(*args, **event.model.parse_obj(data).dict(), **kwargs)
 
-            self._bind_event(BoundEvent(event, event.model, handler, getattr(function, "__sio_doc__", None)))
+            event.handler = handler
+            self._bind_event(event)
             return event
 
         return bind_pub_wrapper
@@ -75,7 +43,7 @@ class EventGroup(EventGroupBase):
         if self.namespace is not None:
             event.attach_namespace(self.namespace)
         kebabify_model(event.model)
-        self._bind_event(BoundEvent(event, event.model))
+        self._bind_event(event)
         self._bind_model(event.model)
         return event
 
@@ -104,8 +72,8 @@ class EventGroup(EventGroupBase):
                     args.append(event)
                 return function(*args, **event.client_event.model.parse_obj(data).dict(), **kwargs)
 
-            self._bind_event(BoundEvent(event, event.client_event.model,
-                                        handler, getattr(function, "__sio_doc__", None)))
+            event.client_event.handler = handler
+            self._bind_event(event)
             return event
 
         return bind_dup_wrapper
@@ -130,8 +98,3 @@ class EventGroup(EventGroupBase):
             description=description
         )
         return self.bind_dup_full(event, same_model, use_event)
-
-    def attach_namespace(self, namespace: str):
-        self.namespace = namespace
-        for event in self.bound_events:
-            event.event.attach_namespace(namespace)
