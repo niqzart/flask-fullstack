@@ -7,6 +7,7 @@ from typing import Type, Iterable, Callable
 from pydantic import BaseModel
 
 from .events import ClientEvent, ServerEvent, DuplexEvent, BaseEvent
+from .interfaces import EventGroupBase
 from .utils import kebabify_model
 
 
@@ -18,16 +19,10 @@ class BoundEvent:
     additional_docs: dict = None
 
 
-class EventGroup:
-    ClientEvent: Type[ClientEvent] = ClientEvent
-    ServerEvent: Type[ServerEvent] = ServerEvent
-    DuplexEvent: Type[DuplexEvent] = DuplexEvent
-
+class EventGroup(EventGroupBase):
     def __init__(self, namespace: str = None, use_kebab_case: bool = False):
-        self.use_kebab_case: bool = use_kebab_case
+        super().__init__(namespace, use_kebab_case)
         self.bound_events: list[BoundEvent] = []
-        self.bound_models: list[Type[BaseModel]] = []
-        self.namespace: str | None = namespace
 
     @staticmethod
     def _kebabify(name: str | None, model: Type[BaseModel]) -> str | None:
@@ -48,27 +43,12 @@ class EventGroup:
         return OrderedDict((self._get_event_name(bound_event), self._get_model_reference(bound_event, namespace))
                            for bound_event in self.bound_events)
 
-    @staticmethod
-    def _get_model_name(bound_model: Type[BaseModel]):
-        return bound_model.__name__
-
-    @staticmethod
-    def _get_model_schema(bound_model: Type[BaseModel]):
-        return {"payload": bound_model.schema(ref_template="#/components/messages/{model}")}
-
-    def extract_doc_messages(self) -> OrderedDict[str, ...]:
-        return OrderedDict((self._get_model_name(bound_model), self._get_model_schema(bound_model))
-                           for bound_model in self.bound_models)
-
     def extract_handlers(self) -> Iterable[tuple[str, Callable]]:
         for bound_event in self.bound_events:
             yield bound_event.event.name, bound_event.handler
 
     def _bind_event(self, bound_event: BoundEvent):
         self.bound_events.append(bound_event)
-
-    def _bind_model(self, bound_model: Type[BaseModel]):
-        self.bound_models.append(bound_model)
 
     def bind_pub_full(self, event: ClientEvent) -> Callable[[Callable], ClientEvent]:
         if self.namespace is not None:

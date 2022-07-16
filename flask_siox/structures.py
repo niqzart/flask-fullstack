@@ -6,7 +6,7 @@ from logging import Filter, getLogger
 
 from flask_socketio import Namespace as _Namespace, SocketIO as _SocketIO
 
-from .groups import EventGroup
+from .interfaces import EventGroupBase
 
 
 class Namespace(_Namespace):
@@ -16,7 +16,7 @@ class Namespace(_Namespace):
         self.doc_messages = OrderedDict()
         self.use_kebab_case = use_kebab_case
 
-    def attach_event_group(self, event_group: EventGroup):
+    def attach_event_group(self, event_group: EventGroupBase):
         event_group.attach_namespace(self.namespace)
         self.doc_channels.update(event_group.extract_doc_channels())
         self.doc_messages.update(event_group.extract_doc_messages())
