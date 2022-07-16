@@ -12,9 +12,10 @@ from .utils import remove_none, unpack_params, render_model, render_packed
 
 
 class BaseEvent:  # do not instantiate!
-    def __init__(self, name: str = None, namespace: str = None):
+    def __init__(self, name: str = None, namespace: str = None, additional_docs: dict = None):
         self.name = None
         self.namespace = namespace
+        self.additional_docs: dict | None = additional_docs
         if name is not None:
             self.attach_name(name)
 
@@ -29,8 +30,9 @@ class BaseEvent:  # do not instantiate!
 
 
 class Event(BaseEvent):  # do not instantiate!
-    def __init__(self, model: Type[BaseModel], namespace: str = None, name: str = None, description: str = None):
-        super().__init__(name, namespace)
+    def __init__(self, model: Type[BaseModel], namespace: str = None, name: str = None,
+                 description: str = None, additional_docs: dict = None):
+        super().__init__(name, namespace, additional_docs)
         self.model: Type[BaseModel] = model
         self.description: str = description
 
@@ -44,20 +46,22 @@ class Event(BaseEvent):  # do not instantiate!
         model_name: str = getattr(self.model, "name", None) or self.model.__name__
         if namespace is None:
             namespace = self.namespace
-        return remove_none({
-            "description": self.description,
-            "tags": [{"name": f"namespace-{namespace}"}] if namespace is None else [],
-            "message": {"$ref": f"#/components/messages/{model_name}"}
-        }, **(additional_docs or {}))
+        return remove_none(
+            {"description": self.description,
+             "tags": [{"name": f"namespace-{namespace}"}] if namespace is None else [],
+             "message": {"$ref": f"#/components/messages/{model_name}"}},
+            **(self.additional_docs or {}),
+            **(additional_docs or {}),
+        )
 
 
 @dataclass()
 class ClientEvent(Event):
     def __init__(self, model: Type[BaseModel], ack_model: Type[BaseModel] = None, namespace: str = None,
                  name: str = None, description: str = None, handler: Callable = None,
-                 include: set[str] = None, exclude: set[str] = None,
-                 force_wrap: bool = None, exclude_none: bool = None):
-        super().__init__(model, namespace, name, description)
+                 include: set[str] = None, exclude: set[str] = None, force_wrap: bool = None,
+                 exclude_none: bool = None, additional_docs: dict = None):
+        super().__init__(model, namespace, name, description, additional_docs)
         self._ack_kwargs = {
             "exclude_none": exclude_none is not False,
             "include": include,
@@ -112,9 +116,10 @@ class ClientEvent(Event):
 
 @dataclass()
 class ServerEvent(Event):
-    def __init__(self, model: Type[BaseModel], namespace: str = None, name: str = None, description: str = None,
-                 include: set[str] = None, exclude: set[str] = None, exclude_none: bool = None):
-        super().__init__(model, namespace, name, description)
+    def __init__(self, model: Type[BaseModel], namespace: str = None, name: str = None,
+                 description: str = None, include: set[str] = None, exclude: set[str] = None,
+                 exclude_none: bool = None, additional_docs: dict = None):
+        super().__init__(model, namespace, name, description, additional_docs)
         self._emit_kwargs = {
             "exclude_none": exclude_none is not False,
             "include": include,
@@ -138,8 +143,8 @@ class ServerEvent(Event):
 @dataclass()
 class DuplexEvent(BaseEvent):
     def __init__(self, client_event: ClientEvent = None, server_event: ServerEvent = None, use_event: bool = None,
-                 namespace: str = None, name: str = None, description: str = None):
-        super().__init__(name, namespace)
+                 namespace: str = None, name: str = None, description: str = None, additional_docs: dict = None):
+        super().__init__(name, namespace, additional_docs)
         self.client_event: ClientEvent = client_event
         self.server_event: ServerEvent = server_event
         self.description: str = description
@@ -149,12 +154,12 @@ class DuplexEvent(BaseEvent):
     def similar(cls, model: Type[BaseModel], ack_model: Type[BaseModel] = None, use_event: bool = None,
                 name: str = None, description: str = None, namespace: str = None, handler: Callable = None,
                 include: set[str] = None, exclude: set[str] = None, exclude_none: bool = True,
-                ack_include: set[str] = None, ack_exclude: set[str] = None,
-                ack_exclude_none: bool = True, ack_force_wrap: bool = False):
+                ack_include: set[str] = None, ack_exclude: set[str] = None, ack_exclude_none: bool = True,
+                ack_force_wrap: bool = False, additional_docs: dict = None):
         return cls(ClientEvent(model, ack_model, namespace, name, description, handler,
-                               ack_include, ack_exclude, ack_exclude_none, ack_force_wrap),
+                               ack_include, ack_exclude, ack_force_wrap, ack_exclude_none),
                    ServerEvent(model, name, namespace, description, include, exclude, exclude_none),
-                   use_event, namespace, name, description)
+                   use_event, namespace, name, description, additional_docs)
 
     def attach_name(self, name: str):
         self.name = name
@@ -174,10 +179,12 @@ class DuplexEvent(BaseEvent):
             @wraps(function)
             def duplex_handler(*args, **kwargs):
                 return function(*args, event=self, **kwargs)
+
             return self.client_event.bind(duplex_handler)
         return self.client_event.bind(function)
 
     def create_doc(self, namespace: str = None, additional_docs: dict = None):
+        additional_docs.update(self.additional_docs or {})
         result: dict = self.client_event.create_doc(namespace, additional_docs)
         result.update(self.server_event.create_doc(namespace, additional_docs))
         if self.description is not None:
