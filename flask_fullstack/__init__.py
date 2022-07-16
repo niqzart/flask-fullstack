@@ -6,7 +6,7 @@ from .marshals import ResponseDoc, DateTimeField, Model, PydanticModel
 from .mixins import AbstractAbortMixin, DatabaseSearcherMixin, JWTAuthorizerMixin
 from .parsers import counter_parser, password_parser
 from .pytest import check_code
-from .restx import RestXNamespace, Undefined
+from .restx import ResourceController, Undefined
 from .sqlalchemy import Sessionmaker, JSONWithModel
 from .utils import TypeEnum, get_or_pop, dict_equal
 from .whoosh import IndexService, Searcher
