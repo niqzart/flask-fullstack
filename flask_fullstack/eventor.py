@@ -55,7 +55,7 @@ class ServerEvent(_ServerEvent):
             _data = self.model.convert(_data, **kwargs)
         return super().emit(_room, _include_self, _data, _namespace, **kwargs)
 
-    def emit_convert(self, data: ..., room: str = None, include_self: bool = None,
+    def emit_convert(self, data: ... = None, room: str = None, include_self: bool = None,
                      user_id: int = None, namespace: str = None, **kwargs):
         if user_id is not None:
             room = f"user-{user_id}"
@@ -67,7 +67,7 @@ class ServerEvent(_ServerEvent):
 class DuplexEvent(_DuplexEvent):
     server_event: ServerEvent
 
-    def emit_convert(self, data: ..., room: str = None, include_self: bool = None,
+    def emit_convert(self, data: ... = None, room: str = None, include_self: bool = None,
                      user_id: int = None, namespace: str = None, **kwargs):
         self.server_event.emit_convert(data, room, include_self, user_id, namespace, **kwargs)
 

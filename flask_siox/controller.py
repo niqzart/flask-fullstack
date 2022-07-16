@@ -57,7 +57,7 @@ class EventController(EventGroupBase):
 
             if event_data.get("duplex", False):
                 server_kwargs = {n: event_data.get(n, None) for n in self.model_kwarg_names}
-                server_event = self.ServerEvent(event_data.get("server_model", client_model), **server_kwargs)
+                server_event = self.ServerEvent(event_data.get("server_model", None) or client_model, **server_kwargs)
                 duplex_event = self.DuplexEvent(client_event, server_event, event_data.get("use_event", None),
                                                 additional_docs=additional_docs)
                 duplex_event.bind(function)
