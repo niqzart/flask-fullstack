@@ -103,7 +103,7 @@ class EventGroupBase(EventGroupBaseMixedIn):
         raise EventException(error_code, description, critical)
 
 
-class EventGroup(_EventGroup, EventGroupBase):
+class EventGroup(_EventGroup, EventGroupBase):  # DEPRECATED
     pass
 
 

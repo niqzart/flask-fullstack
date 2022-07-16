@@ -9,7 +9,7 @@ from .interfaces import EventGroupBase
 from .utils import kebabify_model
 
 
-class EventGroup(EventGroupBase):
+class EventGroup(EventGroupBase):  # DEPRECATED
     @staticmethod
     def _kebabify(name: str | None, model: Type[BaseModel]) -> str | None:
         kebabify_model(model)
