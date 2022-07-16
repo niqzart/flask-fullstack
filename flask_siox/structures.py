@@ -32,22 +32,16 @@ class Namespace(_Namespace):
         return on_event_wrapper
 
     def on_connect(self, function: Callable[[...], None] | None = None):
-        if function is None:
-            def on_connect_wrapper(function: Callable[[...], None]):
-                setattr(self, f"on_connect", function)
+        def on_connect_wrapper(function: Callable[[...], None]):
+            setattr(self, f"on_connect", function)
 
-            return on_connect_wrapper
-
-        setattr(self, f"on_connect", function)
+        return on_connect_wrapper if function is None else on_connect_wrapper(function)
 
     def on_disconnect(self, function: Callable[[...], None] = None):
-        if function is None:
-            def on_disconnect_wrapper(function: Callable[[...], None]):
-                setattr(self, f"on_disconnect", function)
+        def on_disconnect_wrapper(function: Callable[[...], None]):
+            setattr(self, f"on_disconnect", function)
 
-            return on_disconnect_wrapper
-
-        setattr(self, f"on_disconnect", function)
+        return on_disconnect_wrapper if function is None else on_disconnect_wrapper(function)
 
     def attach_event_group(self, event_group: EventGroupBase):
         event_group.attach_namespace(self.namespace)
@@ -78,9 +72,9 @@ class SocketIO(_SocketIO):
 
     def __init__(self, app=None, title: str = "SIO", version: str = "1.0.0", doc_path: str = "/sio-doc/",
                  remove_ping_pong_logs: bool = False, use_kebab_case: bool = False,
-                 namespace_class: Type[Namespace] = default_namespace_class, **kwargs):
+                 namespace_class: Type[Namespace] = None, **kwargs):
         self.use_kebab_case = use_kebab_case
-        self.namespace_class = namespace_class
+        self.namespace_class = self.default_namespace_class if namespace_class is None else namespace_class
 
         self.async_api = {"asyncapi": "2.2.0", "info": {"title": title, "version": version},
                           "channels": OrderedDict(), "components": {"messages": OrderedDict()}}
