@@ -59,8 +59,8 @@ class Event(BaseEvent):  # do not instantiate!
 class ClientEvent(Event):
     def __init__(self, model: Type[BaseModel], ack_model: Type[BaseModel] = None, namespace: str = None,
                  name: str = None, description: str = None, handler: Callable = None,
-                 include: set[str] = None, exclude: set[str] = None, force_wrap: bool = None,
-                 exclude_none: bool = None, additional_docs: dict = None):
+                 include: set[str] = None, exclude: set[str] = None, exclude_none: bool = None,
+                 force_wrap: bool = None, force_ack: bool = None, additional_docs: dict = None):
         super().__init__(model, namespace, name, description, additional_docs)
         self._ack_kwargs = {
             "exclude_none": exclude_none is not False,
@@ -71,6 +71,7 @@ class ClientEvent(Event):
         self.handler: Callable[[dict | None], dict] = handler
         self.ack_model: Type[BaseModel] = ack_model
         self.force_wrap: bool = force_wrap is True
+        self.forced_ack: bool = force_ack is True and ack_model is None
 
     def parse(self, data: dict):
         return self.model.parse_obj(data).dict()
@@ -78,22 +79,28 @@ class ClientEvent(Event):
     def _force_wrap(self, result) -> dict:
         return {"data": result}
 
+    def _render_model(self, result) -> dict | str | int | None:
+        if self.forced_ack:
+            return result
+        return render_model(self.ack_model, result, **self._ack_kwargs)
+
     def _ack_response(self, result) -> dict:
-        if isinstance(result, Sequence):
-            return render_packed(*unpack_params(self.ack_model, result, **self._ack_kwargs))
+        if isinstance(result, Sequence) and not isinstance(result, str):
+            result, code, message = unpack_params(result)
+            return render_packed(self._render_model(result), code, message)
         else:
-            result = render_model(self.ack_model, result, **self._ack_kwargs)
+            result = self._render_model(result)
             return self._force_wrap(result) if self.force_wrap else result
 
     def _handler(self, function: Callable[..., dict]):
-        if self.ack_model is None:
-            @wraps(function)
-            def _handler_inner(*args, **kwargs):
-                return function(*args, **kwargs)
-        else:
+        if self.forced_ack or self.ack_model is not None:
             @wraps(function)
             def _handler_inner(*args, **kwargs):
                 return self._ack_response(function(*args, **kwargs))
+        else:
+            @wraps(function)
+            def _handler_inner(*args, **kwargs):
+                return function(*args, **kwargs)
 
         return _handler_inner
 
@@ -161,9 +168,9 @@ class DuplexEvent(BaseEvent):
                 name: str = None, description: str = None, namespace: str = None, handler: Callable = None,
                 include: set[str] = None, exclude: set[str] = None, exclude_none: bool = True,
                 ack_include: set[str] = None, ack_exclude: set[str] = None, ack_exclude_none: bool = True,
-                ack_force_wrap: bool = False, additional_docs: dict = None):
+                ack_force_wrap: bool = None, ack_force: bool = None, additional_docs: dict = None):
         return cls(ClientEvent(model, ack_model, namespace, name, description, handler,
-                               ack_include, ack_exclude, ack_force_wrap, ack_exclude_none),
+                               ack_include, ack_exclude, ack_exclude_none, ack_force_wrap, ack_force),
                    ServerEvent(model, name, namespace, description, include, exclude, exclude_none),
                    use_event, namespace, name, description, additional_docs)
 

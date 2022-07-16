@@ -15,20 +15,23 @@ def render_model(model: Type[BaseModel], data, **kwargs) -> dict:
     return data.dict(**kwargs)
 
 
-def unpack_params(model: Type[BaseModel], result: Sequence, **kwargs) -> tuple[dict, int | None, str | None]:
+def unpack_params(result: Sequence) -> tuple[dict | None, int | None, str | None]:
     code: int | None = None
     message: str | None = None
 
     if len(result) == 2:
-        result, second = result
+        data, second = result
         if isinstance(second, int):
             code = second
         elif isinstance(second, str):
             message = second
     elif len(result) == 3:
-        result, code, message = result
+        data, code, message = result
 
-    return render_model(model, result, **kwargs), code, message
+    if isinstance(data, str) and message is None:
+        return None, code, data
+
+    return data, code, message
 
 
 def render_packed(data: dict | str | int | None = None, code: int | None = None, message: str | None = None) -> dict:

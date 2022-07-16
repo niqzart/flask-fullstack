@@ -13,6 +13,7 @@ from .utils import kebabify_model
 class EventController(EventGroupBase):
     model_kwarg_names = ("include", "exclude", "exclude_none")
     ack_kwarg_names = {n: "ack_" + n for n in model_kwarg_names + ("force_wrap",)}
+    ack_kwarg_names["force_ack"] = "force_ack"
 
     @staticmethod
     def _update_event_data(function: Callable, data: dict) -> Callable:
@@ -96,6 +97,12 @@ class EventController(EventGroupBase):
             return self._marshal_ack_wrapper(ack_model, ack_kwargs, function)
 
         return marshal_ack_wrapper
+
+    def force_ack(self, force_wrap: bool = None):
+        def force_ack_wrapper(function: Callable) -> Callable:
+            return self._update_event_data(function, {"force_ack": True, "ack_force_wrap": force_wrap})
+
+        return force_ack_wrapper
 
     def with_cls(self, cls: type, function: Callable):
         @wraps(function)

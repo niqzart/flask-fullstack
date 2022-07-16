@@ -28,13 +28,18 @@ class EventGroupBaseMixedIn(_EventGroupBase, DatabaseSearcherMixin, JWTAuthorize
 class ClientEvent(_ClientEvent):
     def __init__(self, model: Type[BaseModel], ack_model: Type[BaseModel] = None, namespace: str = None,
                  name: str = None, description: str = None, handler: Callable = None,
-                 include: set[str] = None, exclude: set[str] = None, force_wrap: bool = None,
-                 exclude_none: bool = None, additional_docs: dict = None):
-        super().__init__(model, ack_model, namespace, name, description, handler,
-                         include, exclude, force_wrap is not False, exclude_none, additional_docs)
+                 include: set[str] = None, exclude: set[str] = None, exclude_none: bool = None,
+                 force_wrap: bool = None, force_ack: bool = None, additional_docs: dict = None):
+        super().__init__(model, ack_model, namespace, name, description, handler, include, exclude,
+                         exclude_none, force_wrap is not False, force_ack is not False, additional_docs)
 
-    def _force_wrap(self, result) -> dict:
-        return {"data": result, "code": 200}
+    def _force_wrap(self, data) -> dict:
+        result = {"code": 200, "message": "Success"}
+        if isinstance(data, str):
+            result["message"] = data
+        elif data is not None:
+            result["data"] = data
+        return result
 
     def parse(self, data=None) -> dict:
         if data is None:
