@@ -183,19 +183,29 @@ class EventGroup:
     def argument_parser(self, model: Type[BaseModel]) -> Callable[[Callable], Callable]:
         return self.updates_event_data(model=model)
 
-    def mark_duplex(self, server_model: Type[BaseModel] = None) -> Callable[[Callable], Callable]:
-        return self.updates_event_data(server_model=server_model, duplex=True)
+    model_kwarg_names = ("include", "exclude", "exclude_none")
+    ack_kwarg_names = {n: "ack_" + n for n in model_kwarg_names + ("force_wrap",)}
 
-    def marshal_ack(self, ack_model: Type[BaseModel]) -> Callable[[Callable], Callable]:
-        # TODO ack parameters + replace defaults with None
-        return self.updates_event_data(ack_model=ack_model)
+    def mark_duplex(self, server_model: Type[BaseModel] = None, include: set[str] = None,
+                    exclude: set[str] = None, exclude_none: bool = True) -> Callable[[Callable], Callable]:
+        return self.updates_event_data(server_model=server_model, duplex=True,
+                                       include=include, exclude=exclude, exclude_none=exclude_none)
+
+    def marshal_ack(self, ack_model: Type[BaseModel], include: set[str] = None, exclude: set[str] = None,
+                    force_wrap: bool = False, exclude_none: bool = True) -> Callable[[Callable], Callable]:
+        # TODO replace defaults with None
+        return self.updates_event_data(ack_model=ack_model, ack_include=include, ack_exclude=exclude,
+                                       ack_force_wrap=force_wrap, ack_exclude_none=exclude_none)
 
     def render_event_data(self, event_data: dict) -> ClientEvent | DuplexEvent:
         client_model = event_data.get("model", BaseModel)
-        client_event = self.ClientEvent(client_model, event_data.get("ack_model", None))
+        ack_kwargs = {n: event_data.get(v, None) for n, v in self.ack_kwarg_names.items()}
+        client_event = self.ClientEvent(client_model, event_data.get("ack_model", None), **ack_kwargs)
 
         if event_data.get("duplex", False):
-            return self.DuplexEvent(client_event, self.ServerEvent(event_data.get("server_model", client_model)))
+            server_model = event_data.get("server_model", client_model)
+            server_kwargs = {n: event_data.get(n, None) for n in self.model_kwarg_names}
+            return self.DuplexEvent(client_event, self.ServerEvent(server_model, **server_kwargs))
 
         return client_event
 
