@@ -48,7 +48,7 @@ class Event(BaseEvent):  # do not instantiate!
             namespace = self.namespace
         return remove_none(
             {"description": self.description,
-             "tags": [{"name": f"namespace-{namespace}"}] if namespace is None else [],
+             "tags": [{"name": f"namespace-{namespace}"}] if namespace is not None else [],
              "message": {"$ref": f"#/components/messages/{model_name}"}},
             **(self.additional_docs or {}),
             **(additional_docs or {}),
@@ -187,6 +187,8 @@ class DuplexEvent(BaseEvent):
         return self.client_event.bind(function)
 
     def create_doc(self, namespace: str = None, additional_docs: dict = None):
+        if additional_docs is None:
+            additional_docs = {}
         additional_docs.update(self.additional_docs or {})
         result: dict = self.client_event.create_doc(namespace, additional_docs)
         result.update(self.server_event.create_doc(namespace, additional_docs))

@@ -15,9 +15,9 @@ from .marshals import PydanticModel
 from .mixins import DatabaseSearcherMixin, JWTAuthorizerMixin
 from .sqlalchemy import Sessionmaker
 from .utils import Nameable, TypeEnum
-from ..flask_siox import (ClientEvent as _ClientEvent, ServerEvent as _ServerEvent, EventGroupBase as _EventGroupBase,
-                          EventGroup as _EventGroup, EventController as _EventController,
-                          Namespace as _Namespace, SocketIO as _SocketIO, EventException)
+from ..flask_siox import (ClientEvent as _ClientEvent, ServerEvent as _ServerEvent, DuplexEvent as _DuplexEvent,
+                          EventGroupBase as _EventGroupBase, EventException, EventGroup as _EventGroup,
+                          EventController as _EventController, Namespace as _Namespace, SocketIO as _SocketIO)
 
 
 class EventGroupBaseMixedIn(_EventGroupBase, DatabaseSearcherMixin, JWTAuthorizerMixin, metaclass=ABCMeta):
@@ -42,16 +42,27 @@ class ServerEvent(_ServerEvent):
             _data = self.model.convert(_data, **kwargs)
         return super().emit(_room, _include_self, _data, _namespace, **kwargs)
 
-    def emit_convert(self, data: ..., room: str = None, include_self: bool = True,
+    def emit_convert(self, data: ..., room: str = None, include_self: bool = None,
                      user_id: int = None, namespace: str = None, **kwargs):
         if user_id is not None:
             room = f"user-{user_id}"
+        if include_self is None:
+            include_self = False
         return self.emit(_data=data, _room=room, _include_self=include_self, _namespace=namespace, **kwargs)
+
+
+class DuplexEvent(_DuplexEvent):
+    server_event: ServerEvent
+
+    def emit_convert(self, data: ..., room: str = None, include_self: bool = None,
+                     user_id: int = None, namespace: str = None, **kwargs):
+        self.server_event.emit_convert(data, room, include_self, user_id, namespace, **kwargs)
 
 
 class EventGroupBase(EventGroupBaseMixedIn):
     ClientEvent = ClientEvent
     ServerEvent = ServerEvent
+    DuplexEvent = DuplexEvent
 
     def __init__(self, sessionmaker: Sessionmaker, namespace: str = None, use_kebab_case: bool = False):
         super().__init__(namespace, use_kebab_case)
