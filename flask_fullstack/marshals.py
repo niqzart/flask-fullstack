@@ -502,17 +502,29 @@ class Model(Nameable):
         return include_context_inner
 
     @classmethod
-    def convert(cls: Type[t], orm_object, **context) -> t:
+    def _convert(cls: Type[t], orm_object, **context) -> t:
         raise NotImplementedError()
+
+    @classmethod
+    def convert(cls: Type[t], orm_object, **context) -> t:
+        if isinstance(orm_object, cls):  # already converted
+            return orm_object
+        return cls._convert(orm_object, **context)
 
     @classmethod
     def model(cls) -> dict[str, Union[Type[RawField], RawField]]:
         raise NotImplementedError()
 
     @classmethod
-    def deconvert(cls: Type[t], data: dict[str, ...]) -> t:
+    def _deconvert(cls: Type[t], data: dict[str, ...]) -> t:
         # TODO version of deconvert for parsing (see argument parser as well)
         raise NotImplementedError()
+
+    @classmethod
+    def deconvert(cls: Type[t], data: t | dict[str, ...]) -> t:
+        if isinstance(data, cls):  # already deconverted
+            return data
+        return cls._convert(data)
 
     @classmethod
     def parser(cls, **kwargs) -> RequestParser:
@@ -568,7 +580,7 @@ class PydanticModel(BaseModel, Model, ABC):
         return result
 
     @classmethod
-    def convert(cls: Type[t], orm_object, **context) -> t:
+    def _convert(cls: Type[t], orm_object, **context) -> t:
         return cls(**cls.dict_convert(orm_object, **context))
 
     @classmethod
@@ -576,5 +588,5 @@ class PydanticModel(BaseModel, Model, ABC):
         return cls.deconvert(obj)
 
     @classmethod
-    def deconvert(cls: Type[t], data: dict[str, ...]) -> t:
+    def _deconvert(cls: Type[t], data: dict[str, ...]) -> t:
         return super().parse_obj(data)
