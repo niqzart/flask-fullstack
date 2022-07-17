@@ -524,7 +524,7 @@ class Model(Nameable):
     def deconvert(cls: Type[t], data: t | dict[str, ...]) -> t:
         if isinstance(data, cls):  # already deconverted
             return data
-        return cls._convert(data)
+        return cls._deconvert(data)
 
     @classmethod
     def parser(cls, **kwargs) -> RequestParser:
