@@ -50,26 +50,30 @@ class ClientEvent(_ClientEvent):
 
 
 class ServerEvent(_ServerEvent):
-    def emit(self, _room: str = None, _include_self: bool = True, _data: ... = None, _namespace: str = None, **kwargs):
+    def emit(self, _room: str = None, _include_self: bool = True, _broadcast: bool = True,
+             _data: ... = None, _namespace: str = None, **kwargs):
         if isinstance(self.model, type) and issubclass(self.model, PydanticModel) and _data is not None:
             _data = self.model.convert(_data, **kwargs)
-        return super().emit(_room, _include_self, _data, _namespace, **kwargs)
+        return super().emit(_room, _include_self, _broadcast, _data, _namespace, **kwargs)
 
     def emit_convert(self, data: ... = None, room: str = None, include_self: bool = None,
-                     user_id: int = None, namespace: str = None, **kwargs):
+                     user_id: int = None, namespace: str = None, broadcast: bool = None, **kwargs):
         if user_id is not None:
             room = f"user-{user_id}"
         if include_self is None:
             include_self = False
-        return self.emit(_data=data, _room=room, _include_self=include_self, _namespace=namespace, **kwargs)
+        if broadcast is None:
+            broadcast = False
+        return self.emit(_data=data, _room=room, _include_self=include_self,
+                         _broadcast=broadcast, _namespace=namespace, **kwargs)
 
 
 class DuplexEvent(_DuplexEvent):
     server_event: ServerEvent
 
     def emit_convert(self, data: ... = None, room: str = None, include_self: bool = None,
-                     user_id: int = None, namespace: str = None, **kwargs):
-        self.server_event.emit_convert(data, room, include_self, user_id, namespace, **kwargs)
+                     user_id: int = None, namespace: str = None, broadcast: bool = None, **kwargs):
+        self.server_event.emit_convert(data, room, include_self, user_id, namespace, broadcast, **kwargs)
 
 
 class EventGroupBase(EventGroupBaseMixedIn):

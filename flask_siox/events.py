@@ -165,13 +165,16 @@ class ServerEvent(Event):
         }
         self.model.Config.allow_population_by_field_name = True
 
-    def _emit(self, data: dict, namespace: str = None, room: str = None, include_self: bool = True):
-        return emit(self.name, data, to=room, include_self=include_self, namespace=namespace)
+    def _emit(self, data: dict, namespace: str = None, room: str = None,
+              include_self: bool = True, broadcast: bool = False):
+        return emit(self.name, data, to=room, include_self=include_self, namespace=namespace, broadcast=broadcast)
 
-    def emit(self, _room: str = None, _include_self: bool = True, _data: ... = None, _namespace: str = None, **kwargs):
+    def emit(self, _room: str = None, _include_self: bool = True, _broadcast: bool = True,
+             _data: ... = None, _namespace: str = None, **kwargs):
         if _data is None:
             _data: BaseModel = self.model(**kwargs)
-        return self._emit(render_model(self.model, _data, **self._emit_kwargs), _namespace, _room, _include_self)
+        return self._emit(render_model(self.model, _data, **self._emit_kwargs),
+                          _namespace, _room, _include_self, _broadcast)
 
     def create_doc(self, namespace: str = None, additional_docs: dict = None):
         return {"subscribe": super().create_doc(namespace, additional_docs)}
@@ -208,8 +211,9 @@ class DuplexEvent(BaseEvent):
         self.client_event.namespace = namespace
         self.server_event.namespace = namespace
 
-    def emit(self, _room: str = None, _include_self: bool = True, _data: ... = None, _namespace: str = None, **kwargs):
-        return self.server_event.emit(_room, _include_self, _data, _namespace, **kwargs)
+    def emit(self, _room: str = None, _include_self: bool = True, _broadcast: bool = True,
+             _data: ... = None, _namespace: str = None, **kwargs):
+        return self.server_event.emit(_room, _include_self, _broadcast, _data, _namespace, **kwargs)
 
     def bind(self, function: Callable[..., dict]):
         if self.use_event:
