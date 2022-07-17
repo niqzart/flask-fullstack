@@ -323,9 +323,9 @@ class Model(Nameable):
                 # TODO make model's ORM attributes usable (__init__?)
                 #   XOR use class properties for Columns in a different way
                 @classmethod
-                def convert(cls: Type[t], orm_object, **context) -> t:
+                def convert_one(cls: Type[t], orm_object, **context) -> t:
                     cls.convert_columns()
-                    result: cls = super().convert(orm_object, **context)
+                    result: cls = super().convert_one(orm_object, **context)
                     for name, column in named_columns.items():
                         object.__setattr__(result, name, getattr(orm_object, column.name or name.replace("-", "_")))
                     return result
@@ -336,13 +336,14 @@ class Model(Nameable):
                     return dict(super().model(), **fields)
 
                 @classmethod
-                def deconvert(cls: Type[t], data: dict[str, ...]) -> t:
+                def deconvert_one(cls: Type[t], data: dict[str, ...]) -> t:
                     cls.convert_columns()
-                    result: cls = super().deconvert(data)
+                    result: cls = super().deconvert_one(data)
                     for name, column in named_columns.items():
-                        value = data.get(name, Undefined)
-                        if value is not Undefined:
-                            object.__setattr__(result, column.name, value)
+                        # value = data.get(name, Undefined)
+                        # if value is not Undefined:
+                        #     object.__setattr__(result, column.name, value)
+                        object.__setattr__(result, column.name, data.get(name, column.default))
                     return result
 
                 @classmethod
@@ -385,14 +386,14 @@ class Model(Nameable):
         def include_nest_model_inner(cls: Type[t]) -> Type[t]:
             class ModModel(cls):
                 @classmethod
-                def convert(cls: Type[t], orm_object, **context) -> t:
+                def convert_one(cls: Type[t], orm_object, **context) -> t:
                     nested = getattr(orm_object, parameter_name)
                     if as_list:
-                        nested = [model.convert(item, **context) for item in nested]
+                        nested = [model.convert_one(item, **context) for item in nested]
                     elif nested is not None:
-                        nested = model.convert(nested, **context)
+                        nested = model.convert_one(nested, **context)
 
-                    result: cls = super().convert(orm_object, **context)
+                    result: cls = super().convert_one(orm_object, **context)
                     object.__setattr__(result, field_name, nested)
                     return result
 
@@ -403,8 +404,8 @@ class Model(Nameable):
                         required=required, as_list=as_list, allow_null=not required, skip_none=skip_none)})
 
                 @classmethod
-                def deconvert(cls: Type[t], data: dict[str, ...]) -> t:
-                    result: cls = super().deconvert(data)
+                def deconvert_one(cls: Type[t], data: dict[str, ...]) -> t:
+                    result: cls = super().deconvert_one(data)
                     object.__setattr__(result, parameter_name, data[field_name])
                     return result
 
@@ -430,11 +431,11 @@ class Model(Nameable):
         def include_flat_nest_model_inner(cls: Type[t]) -> Type[t]:
             class ModModel(cls):
                 @classmethod
-                def convert(cls: Type[t], orm_object, **context) -> t:
-                    result: cls = super().convert(orm_object, **context)
+                def convert_one(cls: Type[t], orm_object, **context) -> t:
+                    result: cls = super().convert_one(orm_object, **context)
                     nested = getattr(orm_object, parameter_name)
                     if nested is not None:
-                        nested = model.convert(nested, **context)
+                        nested = model.convert_one(nested, **context)
                         for field_name in model.model():
                             object.__setattr__(result, field_name, getattr(nested, field_name, None))
                     return result
@@ -444,7 +445,7 @@ class Model(Nameable):
                     return dict(super().model(), **model.model())
 
                 @classmethod
-                def deconvert(cls: Type[t], data: dict[str, ...]) -> t:
+                def deconvert_one(cls: Type[t], data: dict[str, ...]) -> t:
                     raise NotImplementedError("Inner flattened model deconverting is not supported yet")
 
                 @classmethod
@@ -490,33 +491,33 @@ class Model(Nameable):
         def include_context_inner(cls: Type[t]) -> Type[t]:
             class ModModel(cls):
                 @classmethod
-                def convert(cls: Type[t], orm_object, **context) -> t:
+                def convert_one(cls: Type[t], orm_object, **context) -> t:
                     assert all((value := context.get(name, None)) is not None
                                and isinstance(value, var_type)
                                for name, var_type in var_types.items()), \
                         "Context was not filled properly"  # TODO better error messages!
-                    return super().convert(orm_object, **context)
+                    return super().convert_one(orm_object, **context)
 
             return ModModel
 
         return include_context_inner
 
     @classmethod
-    def _convert(cls: Type[t], orm_object, **context) -> t:
+    def convert_one(cls: Type[t], orm_object, **context) -> t:
         raise NotImplementedError()
 
     @classmethod
     def convert(cls: Type[t], orm_object, **context) -> t:
         if isinstance(orm_object, cls):  # already converted
             return orm_object
-        return cls._convert(orm_object, **context)
+        return cls.convert_one(orm_object, **context)
 
     @classmethod
     def model(cls) -> dict[str, Union[Type[RawField], RawField]]:
         raise NotImplementedError()
 
     @classmethod
-    def _deconvert(cls: Type[t], data: dict[str, ...]) -> t:
+    def deconvert_one(cls: Type[t], data: dict[str, ...]) -> t:
         # TODO version of deconvert for parsing (see argument parser as well)
         raise NotImplementedError()
 
@@ -524,7 +525,7 @@ class Model(Nameable):
     def deconvert(cls: Type[t], data: t | dict[str, ...]) -> t:
         if isinstance(data, cls):  # already deconverted
             return data
-        return cls._deconvert(data)
+        return cls.deconvert_one(data)
 
     @classmethod
     def parser(cls, **kwargs) -> RequestParser:
@@ -580,7 +581,7 @@ class PydanticModel(BaseModel, Model, ABC):
         return result
 
     @classmethod
-    def _convert(cls: Type[t], orm_object, **context) -> t:
+    def convert_one(cls: Type[t], orm_object, **context) -> t:
         return cls(**cls.dict_convert(orm_object, **context))
 
     @classmethod
@@ -588,5 +589,5 @@ class PydanticModel(BaseModel, Model, ABC):
         return cls.deconvert(obj)
 
     @classmethod
-    def _deconvert(cls: Type[t], data: dict[str, ...]) -> t:
+    def deconvert_one(cls: Type[t], data: dict[str, ...]) -> t:
         return super().parse_obj(data)
