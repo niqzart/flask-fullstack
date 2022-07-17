@@ -130,6 +130,11 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
         return doc_responses_wrapper
 
+    def _marshal_result(self, result, fields: Type[Model], as_list: bool, **context):
+        if as_list:
+            return [fields.convert(d, **context) for d in result]
+        return fields.convert(result, **context)
+
     def marshal_with(self, fields: BaseModel | Type[Model], as_list=False, skip_none=True, *args, **kwargs):
         result = super().marshal_with
 
@@ -140,9 +145,11 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
                 @wraps(function)
                 @result(model, as_list, *args, skip_none=skip_none, **kwargs)
                 def marshal_with_inner(*args, **kwargs):
-                    if as_list:
-                        return [fields.convert(d) for d in function(*args, **kwargs)]
-                    return fields.convert(function(*args, **kwargs), **kwargs)
+                    result = function(*args, **kwargs)
+                    if isinstance(result, tuple):
+                        result, code, headers = unpack(result)
+                        return self._marshal_result(result, fields, as_list, **kwargs), code, headers
+                    return self._marshal_result(result, fields, as_list, **kwargs)
 
                 return marshal_with_inner
 

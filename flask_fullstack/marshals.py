@@ -93,7 +93,7 @@ column_to_type: dict[Type[TypeEngine], type] = {
 
 
 def pydantic_field_to_kwargs(field: ModelField) -> dict[str, ...]:
-    return {"default": field.default, "required": field.required}
+    return {"default": field.default, "required": field.required, "allow_null": not field.required}
 
 
 def sqlalchemy_column_to_kwargs(column: Column) -> dict[str, ...] | None:
