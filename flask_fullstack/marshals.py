@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC
 from collections import OrderedDict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, date, time
 from typing import Type, Sequence, Union, get_type_hints, Callable, TypeVar, ForwardRef
 
 from flask_restx import Model as _Model, Namespace
@@ -12,7 +12,7 @@ from flask_restx.fields import (Boolean as BooleanField, Integer as IntegerField
 from flask_restx.reqparse import RequestParser
 from pydantic import BaseModel
 from pydantic.fields import ModelField
-from sqlalchemy import Column, Sequence, Float
+from sqlalchemy import Column, Sequence, Float, Date, Time
 from sqlalchemy.sql.type_api import TypeEngine
 from sqlalchemy.types import Boolean, Integer, String, JSON, DateTime, Enum
 
@@ -27,6 +27,16 @@ class EnumField(StringField):
 
 class DateTimeField(StringField):
     def format(self, value: datetime) -> str:
+        return value.isoformat()
+
+
+class DateField(StringField):
+    def format(self, value: date) -> str:
+        return value.isoformat()
+
+
+class TimeField(StringField):
+    def format(self, value: time) -> str:
         return value.isoformat()
 
 
@@ -76,6 +86,8 @@ column_to_field: dict[Type[TypeEngine], Type[RawField]] = {
     JSONWithModel: JSONWithModelField,
     JSON: JSONLoadableField,
     DateTime: DateTimeField,
+    Date: DateField,
+    Time: TimeField,
     Enum: EnumField,
     Boolean: BooleanField,
     Integer: IntegerField,
@@ -134,7 +146,7 @@ def create_fields(column: Column, name: str, use_defaults: bool = False, flatten
         if isinstance(column.type, supported_type):
             break
     else:
-        return {}
+        raise TypeError(f"{column.type} is not supported")
 
     kwargs = {"attribute": attribute or column.name, "default": default, "required": required}
     if issubclass(field_type, JSONWithModelField):
