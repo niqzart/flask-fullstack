@@ -14,7 +14,6 @@ from socketio.exceptions import ConnectionRefusedError
 
 from .marshals import PydanticModel
 from .mixins import DatabaseSearcherMixin, JWTAuthorizerMixin
-from .sqlalchemy import Sessionmaker
 from .utils import Nameable, TypeEnum
 from ..flask_siox import (ClientEvent as _ClientEvent, ServerEvent as _ServerEvent, DuplexEvent as _DuplexEvent,
                           EventGroupBase as _EventGroupBase, EventException, EventGroup as _EventGroup,
@@ -81,12 +80,8 @@ class EventGroupBase(EventGroupBaseMixedIn):
     ServerEvent = ServerEvent
     DuplexEvent = DuplexEvent
 
-    def __init__(self, sessionmaker: Sessionmaker, namespace: str = None, use_kebab_case: bool = False):
+    def __init__(self, namespace: str = None, use_kebab_case: bool = False):
         super().__init__(namespace, use_kebab_case)
-        self.sessionmaker = sessionmaker
-
-    def with_begin(self, function):
-        return self.sessionmaker.with_begin(function)
 
     def _bind_model(self, bound_model: Type[BaseModel]):
         if isinstance(bound_model, type) and issubclass(bound_model, PydanticModel):

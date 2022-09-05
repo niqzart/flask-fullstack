@@ -15,7 +15,6 @@ from flask_restx.utils import unpack, merge
 from .interfaces import UserRole
 from .marshals import ResponseDoc, Model
 from .mixins import DatabaseSearcherMixin, JWTAuthorizerMixin
-from .sqlalchemy import Sessionmaker
 
 Undefined = object()
 
@@ -28,13 +27,9 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
     modifying responses and automatic updates to the Swagger documentation where possible
     """
 
-    def __init__(self, name: str, *, sessionmaker: Sessionmaker, description: str = None, path: str = None,
-                 decorators=None, validate=None, authorizations=None, ordered: bool = False, **kwargs):
+    def __init__(self, name: str, *, description: str = None, path: str = None, decorators=None,
+                 validate=None, authorizations=None, ordered: bool = False, **kwargs):
         super().__init__(name, description, path, decorators, validate, authorizations, ordered, **kwargs)
-        self.sessionmaker = sessionmaker
-
-    def with_begin(self, function):
-        return self.sessionmaker.with_begin(function)
 
     def abort(self, code: int, message: str = None, **kwargs):
         default_abort(code, message, **kwargs)

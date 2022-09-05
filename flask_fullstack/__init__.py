@@ -8,6 +8,6 @@ from .mixins import AbstractAbortMixin, DatabaseSearcherMixin, JWTAuthorizerMixi
 from .parsers import counter_parser, password_parser
 from .pytest import check_code
 from .restx import ResourceController, Undefined
-from .sqlalchemy import Sessionmaker, JSONWithModel
+from .sqlalchemy import Session, Sessionmaker, JSONWithModel
 from .utils import TypeEnum, get_or_pop, dict_equal
 from .whoosh import IndexService, Searcher

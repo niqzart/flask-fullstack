@@ -9,9 +9,11 @@ from sqlalchemy.engine import Row
 from sqlalchemy.orm import sessionmaker, declarative_base, Session as _Session, DeclarativeMeta
 from sqlalchemy.sql import Select
 
-from .utils import Nameable, NamedPropertiesMeta
+from .utils import NamedPropertiesMeta
 
 
+# TODO proper type annotations for Select (mb python3.11's Self type)
+# noinspection PyUnresolvedReferences
 class Session(_Session):
     def get_first(self, stmt: Select) -> object | None:
         return self.execute(stmt).scalars().first()
@@ -81,7 +83,7 @@ class ModBaseMeta(NamedPropertiesMeta, DeclarativeMeta):
     pass
 
 
-class ModBase:
+class ModBase:  # TODO remove session usages?
     @classmethod
     def create(cls: Type[t], session: Session, **kwargs) -> t:
         entry = cls(**kwargs)
