@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from abc import ABCMeta
+from collections.abc import Callable
 from datetime import datetime
 from functools import wraps
 from json import dumps, loads
-from typing import Union, Type, Callable
 
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_restx import Model
@@ -27,7 +27,7 @@ class EventGroupBaseMixedIn(_EventGroupBase, DatabaseSearcherMixin, JWTAuthorize
 
 
 class ClientEvent(_ClientEvent):
-    def __init__(self, model: Type[BaseModel], ack_model: Type[BaseModel] = None, namespace: str = None,
+    def __init__(self, model: type[BaseModel], ack_model: type[BaseModel] = None, namespace: str = None,
                  name: str = None, description: str = None, handler: Callable = None,
                  include: set[str] = None, exclude: set[str] = None, exclude_none: bool = None,
                  force_wrap: bool = None, force_ack: bool = None, additional_docs: dict = None):
@@ -85,28 +85,28 @@ class EventGroupBase(EventGroupBaseMixedIn):
     def __init__(self, namespace: str = None, use_kebab_case: bool = False):
         super().__init__(namespace, use_kebab_case)
 
-    def _bind_model(self, bound_model: Type[BaseModel]):
+    def _bind_model(self, bound_model: type[BaseModel]):
         if isinstance(bound_model, type) and issubclass(bound_model, PydanticModel):
             bound_model.Config.title = bound_model.name
         super()._bind_model(bound_model)
 
-    def doc_abort(self, error_code: Union[int, str], description: str, *, critical: bool = False):
+    def doc_abort(self, error_code: int | str, description: str, *, critical: bool = False):
         def doc_abort_wrapper(function):
             return function
 
         return doc_abort_wrapper
 
-    def _get_model_name(self, bound_model: Type[BaseModel]):
+    def _get_model_name(self, bound_model: type[BaseModel]):
         if isinstance(bound_model, type) and issubclass(bound_model, Nameable):
             return bound_model.name or bound_model.__name__
         return super()._get_model_name(bound_model)
 
-    def _get_model_schema(self, bound_model: Type[BaseModel]):
+    def _get_model_schema(self, bound_model: type[BaseModel]):
         if isinstance(bound_model, type) and issubclass(bound_model, PydanticModel):
             return {"payload": Model(self._get_model_name(bound_model), bound_model.model()).__schema__}
         return super()._get_model_schema(bound_model)
 
-    def abort(self, error_code: Union[int, str], description: str, *, critical: bool = False, **kwargs):
+    def abort(self, error_code: int | str, description: str, *, critical: bool = False, **kwargs):
         raise EventException(error_code, description, critical)
 
 
@@ -115,9 +115,9 @@ class EventGroup(_EventGroup, EventGroupBase):  # DEPRECATED
 
 
 class EventController(_EventController, EventGroupBase):
-    def _marshal_ack_wrapper(self, ack_model: Type[BaseModel], ack_kwargs: dict, function: Callable) -> Callable:
+    def _marshal_ack_wrapper(self, ack_model: type[BaseModel], ack_kwargs: dict, function: Callable) -> Callable:
         if isinstance(ack_model, type) and issubclass(ack_model, PydanticModel):
-            model: Type[PydanticModel] = ack_model
+            model: type[PydanticModel] = ack_model
 
             @wraps(function)
             def marshal_ack_inner(*args, **kwargs):

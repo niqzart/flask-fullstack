@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass
 from logging import Filter, getLogger
-from typing import Callable, Type
 
 from flask_socketio import Namespace as _Namespace, SocketIO as _SocketIO, disconnect
 
@@ -68,11 +68,11 @@ class NoPingPongFilter(Filter):
 
 
 class SocketIO(_SocketIO):
-    default_namespace_class: Type[Namespace] = Namespace
+    default_namespace_class: type[Namespace] = Namespace
 
     def __init__(self, app=None, title: str = "SIO", version: str = "1.0.0", doc_path: str = "/sio-doc/",
                  remove_ping_pong_logs: bool = False, use_kebab_case: bool = False,
-                 namespace_class: Type[Namespace] = None, **kwargs):
+                 namespace_class: type[Namespace] = None, **kwargs):
         self.use_kebab_case = use_kebab_case
         self.namespace_class = self.default_namespace_class if namespace_class is None else namespace_class
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Type, Callable
+from collections.abc import Callable
 
 from pydantic import BaseModel
 
@@ -11,7 +11,7 @@ from ..utils import kebabify_model
 
 class EventGroup(EventGroupBase):  # DEPRECATED
     @staticmethod
-    def _kebabify(name: str | None, model: Type[BaseModel]) -> str | None:
+    def _kebabify(name: str | None, model: type[BaseModel]) -> str | None:
         kebabify_model(model)
         if name is None:
             return None
@@ -33,7 +33,7 @@ class EventGroup(EventGroupBase):  # DEPRECATED
 
         return bind_pub_wrapper
 
-    def bind_pub(self, model: Type[BaseModel], ack_model: Type[BaseModel] = None, *, description: str = None,
+    def bind_pub(self, model: type[BaseModel], ack_model: type[BaseModel] = None, *, description: str = None,
                  name: str = None) -> Callable[[Callable], ClientEvent]:
         if self.use_kebab_case and name is not None:
             name = name.replace("_", "-")
@@ -47,7 +47,7 @@ class EventGroup(EventGroupBase):  # DEPRECATED
         self._bind_model(event.model)
         return event
 
-    def bind_sub(self, model: Type[BaseModel], *, description: str = None, name: str = None) -> ServerEvent:
+    def bind_sub(self, model: type[BaseModel], *, description: str = None, name: str = None) -> ServerEvent:
         if self.use_kebab_case and name is not None:
             name = name.replace("_", "-")
         return self.bind_sub_full(self.ServerEvent(model, name, description))
@@ -78,8 +78,8 @@ class EventGroup(EventGroupBase):  # DEPRECATED
 
         return bind_dup_wrapper
 
-    def bind_dup(self, model: Type[BaseModel], server_model: Type[BaseModel] = None,
-                 ack_model: Type[BaseModel] = None, *, description: str = None,
+    def bind_dup(self, model: type[BaseModel], server_model: type[BaseModel] = None,
+                 ack_model: type[BaseModel] = None, *, description: str = None,
                  name: str = None, use_event: bool = None) -> Callable[[Callable], DuplexEvent]:
         if self.use_kebab_case and name is not None:
             name = name.replace("_", "-")

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from functools import wraps
-from typing import Union, Type, Sequence
 
 from flask import jsonify
 from flask_jwt_extended import unset_jwt_cookies, set_access_cookies, create_access_token, jwt_required
@@ -33,7 +32,7 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
     def abort(self, code: int, message: str = None, **kwargs):
         default_abort(code, message, **kwargs)
 
-    def doc_abort(self, error_code: Union[int, str], description: str, *, critical: bool = False):
+    def doc_abort(self, error_code: int | str, description: str, *, critical: bool = False):
         return self.response(*ResponseDoc.error_response(error_code, description).get_args())
 
     def add_authorization(self, response, auth_agent: UserRole, auth_name: str = None) -> None:
@@ -124,12 +123,12 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
         return doc_responses_wrapper
 
-    def _marshal_result(self, result, fields: Type[Model], as_list: bool, **context):
+    def _marshal_result(self, result, fields: type[Model], as_list: bool, **context):
         if as_list:
             return [fields.convert(d, **context) for d in result]
         return fields.convert(result, **context)
 
-    def marshal_with(self, fields: BaseModel | Type[Model], as_list=False, skip_none=True, *args, **kwargs):
+    def marshal_with(self, fields: BaseModel | type[Model], as_list=False, skip_none=True, *args, **kwargs):
         result = super().marshal_with
 
         if isinstance(fields, type) and issubclass(fields, Model):
@@ -151,7 +150,7 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
         return result(fields, as_list, *args, skip_none=skip_none, **kwargs)
 
-    def marshal(self, data, fields: Type[Model] | ..., context=None, *args, **kwargs):
+    def marshal(self, data, fields: type[Model] | ..., context=None, *args, **kwargs):
         if isinstance(fields, type) and issubclass(fields, Model):
             if isinstance(data, Sequence):
                 data = [fields.convert(d, **context or {}) for d in data]
@@ -160,7 +159,7 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
             fields = self.models.get(fields.name, None) or self.model(model=fields)
         return marshal(data, fields, *args, **kwargs)
 
-    def marshal_with_authorization(self, fields: BaseModel | Type[Model], as_list: bool = False,
+    def marshal_with_authorization(self, fields: BaseModel | type[Model], as_list: bool = False,
                                    auth_name: str = None, **kwargs):
         model = self.models.get(fields.name, None) or self.model(model=fields)
 
@@ -190,7 +189,7 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
         return marshal_with_authorization_wrapper
 
-    def lister(self, per_request: int, marshal_model: BaseModel | Type[Model], skip_none: bool = True,
+    def lister(self, per_request: int, marshal_model: BaseModel | type[Model], skip_none: bool = True,
                count_all: Callable[..., int] | None = None, provided_total: bool = False):
         """
         - Used for organising pagination.

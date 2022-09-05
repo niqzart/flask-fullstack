@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 from collections.abc import Callable
 from datetime import timedelta, datetime, timezone
 from logging.config import dictConfig
 from os import getenv
 from traceback import format_tb
-from typing import Type
 
 from flask import Flask as _Flask, Response, request
 from flask_cors import CORS
@@ -127,7 +128,7 @@ def configure_logging(config: dict):
     dictConfig(config)
 
 
-def configure_sqlalchemy(db_url: str, **engine_kwargs) -> tuple[MetaData, Type[ModBase], Sessionmaker]:
+def configure_sqlalchemy(db_url: str, **engine_kwargs) -> tuple[MetaData, type[ModBase], Sessionmaker]:
     engine = create_engine(db_url, pool_recycle=280, **engine_kwargs)
     return (db_meta := MetaData(bind=engine)), create_base(db_meta), Sessionmaker(bind=engine, class_=Session)
 

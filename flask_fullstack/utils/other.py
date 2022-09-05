@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Union
 
 from .dicts import remove_none
 
@@ -13,7 +12,7 @@ def NotImplementedField(_):
 
 class TypeEnum(Enum):
     @classmethod
-    def from_string(cls, string: str) -> Union[TypeEnum, None]:
+    def from_string(cls, string: str) -> TypeEnum | None:
         return cls.__members__.get(string.upper().replace("-", "_"), None)  # TODO NonePointer!!!
 
     @classmethod

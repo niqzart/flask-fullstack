@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from collections import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from functools import wraps
-from typing import Type, Sequence
 
 from flask_socketio import emit
 from pydantic import BaseModel
@@ -30,10 +29,10 @@ class BaseEvent:  # do not instantiate!
 
 
 class Event(BaseEvent):  # do not instantiate!
-    def __init__(self, model: Type[BaseModel], namespace: str = None, name: str = None,
+    def __init__(self, model: type[BaseModel], namespace: str = None, name: str = None,
                  description: str = None, additional_docs: dict = None):
         super().__init__(name, namespace, additional_docs)
-        self.model: Type[BaseModel] = model
+        self.model: type[BaseModel] = model
         self.description: str = description
 
     def attach_name(self, name: str):
@@ -57,7 +56,7 @@ class Event(BaseEvent):  # do not instantiate!
 
 @dataclass()
 class ClientEvent(Event):
-    def __init__(self, model: Type[BaseModel], ack_model: Type[BaseModel] = None, namespace: str = None,
+    def __init__(self, model: type[BaseModel], ack_model: type[BaseModel] = None, namespace: str = None,
                  name: str = None, description: str = None, handler: Callable = None,
                  include: set[str] = None, exclude: set[str] = None, exclude_none: bool = None,
                  force_wrap: bool = None, force_ack: bool = None, additional_docs: dict = None):
@@ -69,7 +68,7 @@ class ClientEvent(Event):
             "by_alias": True,
         }
         self.handler: Callable[[dict | None], dict] = handler
-        self.ack_model: Type[BaseModel] = ack_model
+        self.ack_model: type[BaseModel] = ack_model
         self.force_wrap: bool = force_wrap is True
         self.forced_ack: bool = force_ack is True and ack_model is None
 
@@ -110,7 +109,7 @@ class ClientEvent(Event):
     def __call__(self, data=None):
         return self.handler(**self.parse(data))
 
-    def attach_ack(self, ack_model: Type[BaseModel], include: set[str] = None, exclude: set[str] = None,
+    def attach_ack(self, ack_model: type[BaseModel], include: set[str] = None, exclude: set[str] = None,
                    force_wrap: bool = None, exclude_none: bool = None) -> None:
         self._ack_kwargs = {
             "exclude_none": exclude_none is not False,
@@ -118,7 +117,7 @@ class ClientEvent(Event):
             "exclude": exclude,
             "by_alias": True,
         }
-        self.ack_model: Type[BaseModel] = ack_model
+        self.ack_model: type[BaseModel] = ack_model
         self.force_wrap: bool = force_wrap is True
         if self.handler is not None:
             self.handler = lambda *args, **kwargs: self._ack_response(self.handler(*args, **kwargs))
@@ -153,7 +152,7 @@ class ClientEvent(Event):
 
 @dataclass()
 class ServerEvent(Event):
-    def __init__(self, model: Type[BaseModel], namespace: str = None, name: str = None,
+    def __init__(self, model: type[BaseModel], namespace: str = None, name: str = None,
                  description: str = None, include: set[str] = None, exclude: set[str] = None,
                  exclude_none: bool = None, additional_docs: dict = None):
         super().__init__(model, namespace, name, description, additional_docs)
@@ -191,7 +190,7 @@ class DuplexEvent(BaseEvent):
         self.use_event: bool = bool(use_event)
 
     @classmethod
-    def similar(cls, model: Type[BaseModel], ack_model: Type[BaseModel] = None, use_event: bool = None,
+    def similar(cls, model: type[BaseModel], ack_model: type[BaseModel] = None, use_event: bool = None,
                 name: str = None, description: str = None, namespace: str = None, handler: Callable = None,
                 include: set[str] = None, exclude: set[str] = None, exclude_none: bool = True,
                 ack_include: set[str] = None, ack_exclude: set[str] = None, ack_exclude_none: bool = True,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from functools import wraps
-from typing import Type, Callable
 
 from pydantic import BaseModel
 
@@ -23,7 +23,7 @@ class EventController(EventGroupBase):
             function.__event_data__ = data
         return function
 
-    def _maybe_bind_model(self, model: Type[BaseModel] | None = None) -> None:
+    def _maybe_bind_model(self, model: type[BaseModel] | None = None) -> None:
         if model is None:
             return
         if self.use_kebab_case:
@@ -45,7 +45,7 @@ class EventController(EventGroupBase):
 
         return add_docs_wrapper
 
-    def argument_parser(self, client_model: Type[BaseModel] = BaseModel):
+    def argument_parser(self, client_model: type[BaseModel] = BaseModel):
         self._maybe_bind_model(client_model)
 
         def argument_parser_wrapper(function: Callable) -> ClientEvent | DuplexEvent:
@@ -69,7 +69,7 @@ class EventController(EventGroupBase):
 
         return argument_parser_wrapper
 
-    def mark_duplex(self, server_model: Type[BaseModel] = None, use_event: bool = None,
+    def mark_duplex(self, server_model: type[BaseModel] = None, use_event: bool = None,
                     include: set[str] = None, exclude: set[str] = None, exclude_none: bool = None):
         self._maybe_bind_model(server_model)
         server_kwargs = {"include": include, "exclude": exclude,
@@ -84,10 +84,10 @@ class EventController(EventGroupBase):
 
         return mark_duplex_wrapper
 
-    def _marshal_ack_wrapper(self, ack_model: Type[BaseModel], ack_kwargs: dict, function: Callable) -> Callable:
+    def _marshal_ack_wrapper(self, ack_model: type[BaseModel], ack_kwargs: dict, function: Callable) -> Callable:
         return self._update_event_data(function, dict(ack_kwargs, ack_model=ack_model))
 
-    def marshal_ack(self, ack_model: Type[BaseModel], include: set[str] = None, exclude: set[str] = None,
+    def marshal_ack(self, ack_model: type[BaseModel], include: set[str] = None, exclude: set[str] = None,
                     force_wrap: bool = None, exclude_none: bool = None):
         self._maybe_bind_model(ack_model)
         ack_kwargs = {"ack_include": include, "ack_exclude": exclude,

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sqlalchemy import select, event
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql import Select

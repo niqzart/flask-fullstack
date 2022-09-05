@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import wraps
-from typing import TypeVar, Type
+from typing import TypeVar
 
 from sqlalchemy import MetaData, select
 from sqlalchemy.engine import Row
@@ -67,7 +67,7 @@ class ModBaseMeta(NamedPropertiesMeta, DeclarativeMeta):
 
 class ModBase:  # TODO remove session usages?
     @classmethod
-    def create(cls: Type[t], session: Session, **kwargs) -> t:
+    def create(cls: type[t], session: Session, **kwargs) -> t:
         entry = cls(**kwargs)
         session.add(entry)
         session.flush()
@@ -80,7 +80,7 @@ class ModBase:  # TODO remove session usages?
         return select(cls).filter_by(**kwargs).order_by(*order_by)
 
     @classmethod
-    def find_first_by_kwargs(cls: Type[t], session, *order_by, **kwargs) -> t | None:
+    def find_first_by_kwargs(cls: type[t], session, *order_by, **kwargs) -> t | None:
         return session.get_first(cls.select_by_kwargs(*order_by, **kwargs))
 
     @classmethod
@@ -88,7 +88,7 @@ class ModBase:  # TODO remove session usages?
         return session.get_first_row(cls.select_by_kwargs(*order_by, **kwargs))
 
     @classmethod
-    def find_all_by_kwargs(cls: Type[t], session, *order_by, **kwargs) -> list[t]:
+    def find_all_by_kwargs(cls: type[t], session, *order_by, **kwargs) -> list[t]:
         return session.get_all(cls.select_by_kwargs(*order_by, **kwargs))
 
     @classmethod
@@ -96,7 +96,7 @@ class ModBase:  # TODO remove session usages?
         return session.get_all_rows(cls.select_by_kwargs(*order_by, **kwargs))
 
     @classmethod
-    def find_paginated_by_kwargs(cls: Type[t], session, offset: int, limit: int, *order_by, **kwargs) -> list[t]:
+    def find_paginated_by_kwargs(cls: type[t], session, offset: int, limit: int, *order_by, **kwargs) -> list[t]:
         return session.get_paginated(cls.select_by_kwargs(*order_by, **kwargs), offset, limit)
 
     @classmethod
@@ -110,6 +110,6 @@ class ModBase:  # TODO remove session usages?
         session.flush()
 
 
-def create_base(meta: MetaData) -> Type[ModBase]:
+def create_base(meta: MetaData) -> type[ModBase]:
     # noinspection PyTypeChecker
     return declarative_base(metadata=meta, cls=ModBase, metaclass=ModBaseMeta)
