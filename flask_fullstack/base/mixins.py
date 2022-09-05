@@ -6,8 +6,8 @@ from typing import Type, Union
 
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
-from .interfaces import Identifiable, UserRole
-from .utils import get_or_pop
+from ..base import Identifiable, UserRole
+from ..utils import get_or_pop
 
 
 class AbstractAbortMixin:
@@ -53,7 +53,6 @@ class DatabaseSearcherMixin(AbstractAbortMixin, metaclass=ABCMeta):
             @self.doc_abort(error_code, identifiable.not_found_text, critical=True)
             @wraps(function)
             def searcher_inner(*args, **kwargs):
-                session = get_or_pop(kwargs, "session", use_session)
                 target_id: int = get_or_pop(kwargs, input_field_name, check_only)
 
                 if (result := identifiable.find_by_id(target_id)) is None:

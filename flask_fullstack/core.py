@@ -7,15 +7,14 @@ from typing import Type
 
 from flask import Flask as _Flask, Response, request
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager, get_jwt, set_access_cookies, create_access_token, get_jwt_identity, \
-    unset_jwt_cookies
+from flask_jwt_extended import (JWTManager, get_jwt, set_access_cookies, create_access_token, get_jwt_identity,
+                                unset_jwt_cookies, )
 from flask_restx import Api
 from sqlalchemy import create_engine, MetaData
 from werkzeug.exceptions import NotFound
 
-from .marshals import flask_restx_has_bad_design
-from .sqlalchemy import Sessionmaker, create_base, ModBase, Session
-from .whoosh import IndexService
+from .restx.marshals import flask_restx_has_bad_design
+from .utils import Sessionmaker, create_base, ModBase, Session, IndexService
 
 
 class Flask(_Flask):

@@ -12,12 +12,14 @@ from flask_socketio import join_room
 from pydantic import BaseModel
 from socketio.exceptions import ConnectionRefusedError
 
-from .marshals import PydanticModel
-from .mixins import DatabaseSearcherMixin, JWTAuthorizerMixin
-from .utils import Nameable, TypeEnum
-from ..flask_siox import (ClientEvent as _ClientEvent, ServerEvent as _ServerEvent, DuplexEvent as _DuplexEvent,
-                          EventGroupBase as _EventGroupBase, EventException, EventGroup as _EventGroup,
-                          EventController as _EventController, Namespace as _Namespace, SocketIO as _SocketIO)
+from .controller import EventController as _EventController
+from .events import ClientEvent as _ClientEvent, ServerEvent as _ServerEvent, DuplexEvent as _DuplexEvent
+from .groups import EventGroup as _EventGroup
+from .structures import EventException
+from .structures import EventGroupBase as _EventGroupBase, Namespace as _Namespace, SocketIO as _SocketIO
+from ..base import DatabaseSearcherMixin, JWTAuthorizerMixin
+from ..restx import PydanticModel
+from ..utils import Nameable, TypeEnum
 
 
 class EventGroupBaseMixedIn(_EventGroupBase, DatabaseSearcherMixin, JWTAuthorizerMixin, metaclass=ABCMeta):

@@ -9,7 +9,7 @@ from sqlalchemy.engine import Row
 from sqlalchemy.orm import sessionmaker, declarative_base, Session as _Session, DeclarativeMeta
 from sqlalchemy.sql import Select
 
-from .utils import NamedPropertiesMeta
+from .named import NamedPropertiesMeta
 
 
 # TODO proper type annotations for Select (mb python3.11's Self type)

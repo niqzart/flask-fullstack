@@ -34,19 +34,3 @@ def dict_equal(dict1: dict, dict2: dict, *keys) -> bool:
     dict1 = {key: dict1.get(key, None) for key in keys}
     dict2 = {key: dict2.get(key, None) for key in keys}
     return dict1 == dict2
-
-
-class Nameable:
-    name: str = None
-
-
-class NamedPropertiesMeta(type):
-    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, ...]):
-        for name, value in namespace.items():
-            if isinstance(value, type) and issubclass(value, Nameable):  # TODO ability to override names
-                value.name = namespace["__qualname__"] + "." + name
-        super().__init__(name, bases, namespace)
-
-
-class NamedProperties(metaclass=NamedPropertiesMeta):
-    pass

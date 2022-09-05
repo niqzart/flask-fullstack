@@ -12,9 +12,8 @@ from flask_restx.marshalling import marshal
 from flask_restx.reqparse import RequestParser
 from flask_restx.utils import unpack, merge
 
-from .interfaces import UserRole
 from .marshals import ResponseDoc, Model
-from .mixins import DatabaseSearcherMixin, JWTAuthorizerMixin
+from ..base import UserRole, DatabaseSearcherMixin, JWTAuthorizerMixin
 
 Undefined = object()
 

@@ -8,7 +8,7 @@ from typing import Type, Sequence, Union, get_type_hints, Callable, TypeVar, For
 
 from flask_restx import Model as _Model, Namespace
 from flask_restx.fields import (Boolean as BooleanField, Integer as IntegerField, Float as FloatField,
-                                String as StringField, Raw as RawField, Nested as NestedField, List as ListField)
+                                String as StringField, Raw as RawField, Nested as NestedField, List as ListField, )
 from flask_restx.reqparse import RequestParser
 from pydantic import BaseModel
 from pydantic.fields import ModelField
@@ -16,8 +16,7 @@ from sqlalchemy import Column, Sequence, Float, Date, Time
 from sqlalchemy.sql.type_api import TypeEngine
 from sqlalchemy.types import Boolean, Integer, String, JSON, DateTime, Enum
 
-from .sqlalchemy import JSONWithModel
-from .utils import TypeEnum, Nameable
+from ..utils import JSONWithModel, TypeEnum, Nameable
 
 
 class EnumField(StringField):
