@@ -8,7 +8,7 @@ from typing import Type, Sequence
 from flask_socketio import emit
 from pydantic import BaseModel
 
-from .utils import remove_none, unpack_params, render_model, render_packed
+from ..utils import remove_none, unpack_params, render_model, render_packed
 
 
 class BaseEvent:  # do not instantiate!

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from .events import ClientEvent, ServerEvent, DuplexEvent
 from .interfaces import EventGroupBase
-from .utils import kebabify_model
+from ..utils import kebabify_model
 
 
 class EventGroup(EventGroupBase):  # DEPRECATED

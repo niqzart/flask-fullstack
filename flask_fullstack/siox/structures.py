@@ -8,7 +8,7 @@ from typing import Callable, Type
 from flask_socketio import Namespace as _Namespace, SocketIO as _SocketIO, disconnect
 
 from .interfaces import EventGroupBase
-from .utils import render_packed
+from ..utils import render_packed
 
 
 @dataclass

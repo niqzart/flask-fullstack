@@ -3,6 +3,8 @@ from __future__ import annotations
 from enum import Enum
 from typing import Union
 
+from .dicts import remove_none
+
 
 @property
 def NotImplementedField(_):
@@ -26,11 +28,9 @@ class TypeEnum(Enum):
         return self.name.lower().replace("_", "-")
 
 
-def get_or_pop(dictionary: dict, key, keep: bool = False):
-    return dictionary[key] if keep else dictionary.pop(key)
-
-
-def dict_equal(dict1: dict, dict2: dict, *keys) -> bool:
-    dict1 = {key: dict1.get(key, None) for key in keys}
-    dict2 = {key: dict2.get(key, None) for key in keys}
-    return dict1 == dict2
+def render_packed(
+    data: dict | str | int | None = None,
+    code: int | None = None,
+    message: str | None = None
+) -> dict:
+    return remove_none({"code": code, "message": message, "data": data})

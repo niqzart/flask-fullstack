@@ -3,8 +3,7 @@ from __future__ import annotations
 from functools import wraps
 from typing import TypeVar, Type
 
-from flask_restx.fields import Raw as RawField
-from sqlalchemy import JSON, MetaData, select
+from sqlalchemy import MetaData, select
 from sqlalchemy.engine import Row
 from sqlalchemy.orm import sessionmaker, declarative_base, Session as _Session, DeclarativeMeta
 from sqlalchemy.sql import Select
@@ -57,23 +56,6 @@ class Sessionmaker(sessionmaker):
                 return function(*args, **kwargs)
 
         return with_autocommit_inner
-
-
-class JSONWithModel(JSON):
-    def __init__(self, model_name: str, model: dict | Type[RawField] | RawField,
-                 as_list: bool = False, none_as_null=False):
-        super().__init__(none_as_null)
-        self.model_name: str = model_name
-        self.model: dict | Type[RawField] | RawField = model
-        self.as_list: bool = as_list
-
-
-class JSONWithSchema(JSON):
-    def __init__(self, schema_type: str, schema_format=None, schema_example=None, none_as_null=False):
-        super().__init__(none_as_null)
-        self.schema_type = schema_type
-        self.schema_format = schema_format
-        self.schema_example = schema_example
 
 
 t = TypeVar("t", bound="ModBase")

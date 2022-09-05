@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from .events import ClientEvent, DuplexEvent, BaseEvent
 from .interfaces import EventGroupBase
-from .utils import kebabify_model
+from ..utils import kebabify_model
 
 
 class EventController(EventGroupBase):
