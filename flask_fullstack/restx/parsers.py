@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from flask_restx.reqparse import RequestParser
 
 counter_parser: RequestParser = RequestParser()

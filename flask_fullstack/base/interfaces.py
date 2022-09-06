@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Type, TypeVar
+from typing import TypeVar
 
 t = TypeVar("t", bound="Identifiable")
 v = TypeVar("v")
@@ -14,13 +14,12 @@ class Identifiable:
     """
 
     not_found_text: str = ""
-    """ Customizable error message to be used for missing ids """
 
     def __init__(self, **kwargs):
         pass
 
     @classmethod
-    def find_by_id(cls: Type[t], session, entry_id: int) -> t | None:
+    def find_by_id(cls: type[t], entry_id: int) -> t | None:
         raise NotImplementedError
 
 
@@ -37,7 +36,7 @@ class UserRole:
         pass
 
     @classmethod
-    def find_by_identity(cls: Type[t], session, identity: v) -> t | None:
+    def find_by_identity(cls: type[t], identity: v) -> t | None:
         raise NotImplementedError
 
     def get_identity(self) -> v:

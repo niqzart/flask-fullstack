@@ -1,18 +1,22 @@
 from __future__ import annotations
 
-from collections import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from functools import wraps
-from typing import Type, Sequence
 
 from flask_socketio import emit
 from pydantic import BaseModel
 
-from .utils import remove_none, unpack_params, render_model, render_packed
+from ..utils import remove_none, unpack_params, render_model, render_packed
 
 
 class BaseEvent:  # do not instantiate!
-    def __init__(self, name: str = None, namespace: str = None, additional_docs: dict = None):
+    def __init__(
+        self,
+        name: str = None,
+        namespace: str = None,
+        additional_docs: dict = None,
+    ):
         self.name = None
         self.namespace = namespace
         self.additional_docs: dict | None = additional_docs
@@ -30,10 +34,16 @@ class BaseEvent:  # do not instantiate!
 
 
 class Event(BaseEvent):  # do not instantiate!
-    def __init__(self, model: Type[BaseModel], namespace: str = None, name: str = None,
-                 description: str = None, additional_docs: dict = None):
+    def __init__(
+        self,
+        model: type[BaseModel],
+        namespace: str = None,
+        name: str = None,
+        description: str = None,
+        additional_docs: dict = None,
+    ):
         super().__init__(name, namespace, additional_docs)
-        self.model: Type[BaseModel] = model
+        self.model: type[BaseModel] = model
         self.description: str = description
 
     def attach_name(self, name: str):
@@ -47,9 +57,13 @@ class Event(BaseEvent):  # do not instantiate!
         if namespace is None:
             namespace = self.namespace
         return remove_none(
-            {"description": self.description,
-             "tags": [{"name": f"namespace-{namespace}"}] if namespace is not None else None,
-             "message": {"$ref": f"#/components/messages/{model_name}"}},
+            {
+                "description": self.description,
+                "tags": [{"name": f"namespace-{namespace}"}]
+                if namespace is not None
+                else None,
+                "message": {"$ref": f"#/components/messages/{model_name}"},
+            },
             **(self.additional_docs or {}),
             **(additional_docs or {}),
         )
@@ -57,10 +71,21 @@ class Event(BaseEvent):  # do not instantiate!
 
 @dataclass()
 class ClientEvent(Event):
-    def __init__(self, model: Type[BaseModel], ack_model: Type[BaseModel] = None, namespace: str = None,
-                 name: str = None, description: str = None, handler: Callable = None,
-                 include: set[str] = None, exclude: set[str] = None, exclude_none: bool = None,
-                 force_wrap: bool = None, force_ack: bool = None, additional_docs: dict = None):
+    def __init__(
+        self,
+        model: type[BaseModel],
+        ack_model: type[BaseModel] = None,
+        namespace: str = None,
+        name: str = None,
+        description: str = None,
+        handler: Callable = None,
+        include: set[str] = None,
+        exclude: set[str] = None,
+        exclude_none: bool = None,
+        force_wrap: bool = None,
+        force_ack: bool = None,
+        additional_docs: dict = None,
+    ):
         super().__init__(model, namespace, name, description, additional_docs)
         self._ack_kwargs = {
             "exclude_none": exclude_none is not False,
@@ -69,7 +94,7 @@ class ClientEvent(Event):
             "by_alias": True,
         }
         self.handler: Callable[[dict | None], dict] = handler
-        self.ack_model: Type[BaseModel] = ack_model
+        self.ack_model: type[BaseModel] = ack_model
         self.force_wrap: bool = force_wrap is True
         self.forced_ack: bool = force_ack is True and ack_model is None
 
@@ -88,9 +113,9 @@ class ClientEvent(Event):
         if isinstance(result, Sequence) and not isinstance(result, str):
             result, code, message = unpack_params(result)
             return render_packed(self._render_model(result), code, message)
-        else:
-            result = self._render_model(result)
-            return self._force_wrap(result) if self.force_wrap else result
+
+        result = self._render_model(result)
+        return self._force_wrap(result) if self.force_wrap else result
 
     def _handler(self, function: Callable[..., dict]):
         if self.forced_ack or self.ack_model is not None:
@@ -110,24 +135,37 @@ class ClientEvent(Event):
     def __call__(self, data=None):
         return self.handler(**self.parse(data))
 
-    def attach_ack(self, ack_model: Type[BaseModel], include: set[str] = None, exclude: set[str] = None,
-                   force_wrap: bool = None, exclude_none: bool = None) -> None:
+    def attach_ack(
+        self,
+        ack_model: type[BaseModel],
+        include: set[str] = None,
+        exclude: set[str] = None,
+        force_wrap: bool = None,
+        exclude_none: bool = None,
+    ) -> None:
         self._ack_kwargs = {
             "exclude_none": exclude_none is not False,
             "include": include,
             "exclude": exclude,
             "by_alias": True,
         }
-        self.ack_model: Type[BaseModel] = ack_model
+        self.ack_model: type[BaseModel] = ack_model
         self.force_wrap: bool = force_wrap is True
         if self.handler is not None:
-            self.handler = lambda *args, **kwargs: self._ack_response(self.handler(*args, **kwargs))
+
+            @wraps(self.handler)
+            def _handler(*args, **kwargs):
+                return self._ack_response(self.handler(*args, **kwargs))
+
+            self.handler = _handler
 
     def ack_model_doc(self):
         if self.forced_ack:
             data = {"type": ["boolean", "integer", "string"]}
         else:
-            model_name: str = getattr(self.ack_model, "name", None) or self.ack_model.__name__
+            model_name: str = (
+                getattr(self.ack_model, "name", None) or self.ack_model.__name__
+            )
             data = {"$ref": f"#/components/messages/{model_name}/payload"}
         return {
             "name": self.name + "-ack",
@@ -137,9 +175,9 @@ class ClientEvent(Event):
                 "properties": {
                     "code": {"type": "integer"},
                     "message": {"type": "string"},
-                    "data": data
-                }
-            }
+                    "data": data,
+                },
+            },
         }
 
     def create_doc(self, namespace: str = None, additional_docs: dict = None):
@@ -153,9 +191,17 @@ class ClientEvent(Event):
 
 @dataclass()
 class ServerEvent(Event):
-    def __init__(self, model: Type[BaseModel], namespace: str = None, name: str = None,
-                 description: str = None, include: set[str] = None, exclude: set[str] = None,
-                 exclude_none: bool = None, additional_docs: dict = None):
+    def __init__(
+        self,
+        model: type[BaseModel],
+        namespace: str = None,
+        name: str = None,
+        description: str = None,
+        include: set[str] = None,
+        exclude: set[str] = None,
+        exclude_none: bool = None,
+        additional_docs: dict = None,
+    ):
         super().__init__(model, namespace, name, description, additional_docs)
         self._emit_kwargs = {
             "exclude_none": exclude_none is not False,
@@ -165,16 +211,41 @@ class ServerEvent(Event):
         }
         self.model.Config.allow_population_by_field_name = True
 
-    def _emit(self, data: dict, namespace: str = None, room: str = None,
-              include_self: bool = True, broadcast: bool = False):
-        return emit(self.name, data, to=room, include_self=include_self, namespace=namespace, broadcast=broadcast)
+    def _emit(
+        self,
+        data: dict,
+        namespace: str = None,
+        room: str = None,
+        include_self: bool = True,
+        broadcast: bool = False,
+    ):
+        return emit(
+            self.name,
+            data,
+            to=room,
+            include_self=include_self,
+            namespace=namespace,
+            broadcast=broadcast,
+        )
 
-    def emit(self, _room: str = None, _include_self: bool = True, _broadcast: bool = True,
-             _data: ... = None, _namespace: str = None, **kwargs):
+    def emit(
+        self,
+        _room: str = None,
+        _include_self: bool = True,
+        _broadcast: bool = True,
+        _data: ... = None,
+        _namespace: str = None,
+        **kwargs,
+    ):
         if _data is None:
             _data: BaseModel = self.model(**kwargs)
-        return self._emit(render_model(self.model, _data, **self._emit_kwargs),
-                          _namespace, _room, _include_self, _broadcast)
+        return self._emit(
+            render_model(self.model, _data, **self._emit_kwargs),
+            _namespace,
+            _room,
+            _include_self,
+            _broadcast,
+        )
 
     def create_doc(self, namespace: str = None, additional_docs: dict = None):
         return {"subscribe": super().create_doc(namespace, additional_docs)}
@@ -182,8 +253,16 @@ class ServerEvent(Event):
 
 @dataclass()
 class DuplexEvent(BaseEvent):
-    def __init__(self, client_event: ClientEvent = None, server_event: ServerEvent = None, use_event: bool = None,
-                 namespace: str = None, name: str = None, description: str = None, additional_docs: dict = None):
+    def __init__(
+        self,
+        client_event: ClientEvent = None,
+        server_event: ServerEvent = None,
+        use_event: bool = None,
+        namespace: str = None,
+        name: str = None,
+        description: str = None,
+        additional_docs: dict = None,
+    ):
         super().__init__(name, namespace, additional_docs)
         self.client_event: ClientEvent = client_event
         self.server_event: ServerEvent = server_event
@@ -191,15 +270,54 @@ class DuplexEvent(BaseEvent):
         self.use_event: bool = bool(use_event)
 
     @classmethod
-    def similar(cls, model: Type[BaseModel], ack_model: Type[BaseModel] = None, use_event: bool = None,
-                name: str = None, description: str = None, namespace: str = None, handler: Callable = None,
-                include: set[str] = None, exclude: set[str] = None, exclude_none: bool = True,
-                ack_include: set[str] = None, ack_exclude: set[str] = None, ack_exclude_none: bool = True,
-                ack_force_wrap: bool = None, ack_force: bool = None, additional_docs: dict = None):
-        return cls(ClientEvent(model, ack_model, namespace, name, description, handler,
-                               ack_include, ack_exclude, ack_exclude_none, ack_force_wrap, ack_force),
-                   ServerEvent(model, name, namespace, description, include, exclude, exclude_none),
-                   use_event, namespace, name, description, additional_docs)
+    def similar(
+        cls,
+        model: type[BaseModel],
+        ack_model: type[BaseModel] = None,
+        use_event: bool = None,
+        name: str = None,
+        description: str = None,
+        namespace: str = None,
+        handler: Callable = None,
+        include: set[str] = None,
+        exclude: set[str] = None,
+        exclude_none: bool = True,
+        ack_include: set[str] = None,
+        ack_exclude: set[str] = None,
+        ack_exclude_none: bool = True,
+        ack_force_wrap: bool = None,
+        ack_force: bool = None,
+        additional_docs: dict = None,
+    ):
+        return cls(
+            ClientEvent(
+                model,
+                ack_model,
+                namespace,
+                name,
+                description,
+                handler,
+                ack_include,
+                ack_exclude,
+                ack_exclude_none,
+                ack_force_wrap,
+                ack_force,
+            ),
+            ServerEvent(
+                model,
+                name,
+                namespace,
+                description,
+                include,
+                exclude,
+                exclude_none,
+            ),
+            use_event,
+            namespace,
+            name,
+            description,
+            additional_docs,
+        )
 
     def attach_name(self, name: str):
         self.name = name
@@ -211,9 +329,23 @@ class DuplexEvent(BaseEvent):
         self.client_event.namespace = namespace
         self.server_event.namespace = namespace
 
-    def emit(self, _room: str = None, _include_self: bool = True, _broadcast: bool = True,
-             _data: ... = None, _namespace: str = None, **kwargs):
-        return self.server_event.emit(_room, _include_self, _broadcast, _data, _namespace, **kwargs)
+    def emit(
+        self,
+        _room: str = None,
+        _include_self: bool = True,
+        _broadcast: bool = True,
+        _data: ... = None,
+        _namespace: str = None,
+        **kwargs,
+    ):
+        return self.server_event.emit(
+            _room,
+            _include_self,
+            _broadcast,
+            _data,
+            _namespace,
+            **kwargs,
+        )
 
     def bind(self, function: Callable[..., dict]):
         if self.use_event:

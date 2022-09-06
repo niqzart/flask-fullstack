@@ -1,17 +1,23 @@
 from __future__ import annotations
 
 from functools import wraps
-from typing import TypeVar, Type
+from typing import TypeVar
 
-from flask_restx.fields import Raw as RawField
-from sqlalchemy import JSON, MetaData, select
+from sqlalchemy import MetaData, select
 from sqlalchemy.engine import Row
-from sqlalchemy.orm import sessionmaker, declarative_base, Session as _Session, DeclarativeMeta
+from sqlalchemy.orm import (
+    sessionmaker,
+    declarative_base,
+    Session as _Session,
+    DeclarativeMeta,
+)
 from sqlalchemy.sql import Select
 
-from .utils import Nameable, NamedPropertiesMeta
+from .named import NamedPropertiesMeta
 
 
+# TODO proper type annotations for Select (mb python3.11's Self type)
+# noinspection PyUnresolvedReferences
 class Session(_Session):
     def get_first(self, stmt: Select) -> object | None:
         return self.execute(stmt).scalars().first()
@@ -34,11 +40,11 @@ class Session(_Session):
 
 class Sessionmaker(sessionmaker):
     def with_begin(self, function):
-        """ Wraps the function with Session.begin() and passes session object to the decorated function """
+        """Wraps the function with Session.begin() and passes session object to the decorated function"""
 
         @wraps(function)
         def with_begin_inner(*args, **kwargs):
-            if "session" in kwargs.keys():
+            if "session" in kwargs:
                 return function(*args, **kwargs)
             with self.begin() as session:
                 kwargs["session"] = session
@@ -47,7 +53,7 @@ class Sessionmaker(sessionmaker):
         return with_begin_inner
 
     def with_autocommit(self, function):
-        """ Wraps the function with Session.begin() for automatic commits after the decorated function """
+        """Wraps the function with Session.begin() for automatic commits after the decorated function"""
 
         @wraps(function)
         def with_autocommit_inner(*args, **kwargs):
@@ -57,23 +63,6 @@ class Sessionmaker(sessionmaker):
         return with_autocommit_inner
 
 
-class JSONWithModel(JSON):
-    def __init__(self, model_name: str, model: dict | Type[RawField] | RawField,
-                 as_list: bool = False, none_as_null=False):
-        super().__init__(none_as_null)
-        self.model_name: str = model_name
-        self.model: dict | Type[RawField] | RawField = model
-        self.as_list: bool = as_list
-
-
-class JSONWithSchema(JSON):
-    def __init__(self, schema_type: str, schema_format=None, schema_example=None, none_as_null=False):
-        super().__init__(none_as_null)
-        self.schema_type = schema_type
-        self.schema_format = schema_format
-        self.schema_example = schema_example
-
-
 t = TypeVar("t", bound="ModBase")
 
 
@@ -81,9 +70,9 @@ class ModBaseMeta(NamedPropertiesMeta, DeclarativeMeta):
     pass
 
 
-class ModBase:
+class ModBase:  # TODO remove session usages?
     @classmethod
-    def create(cls: Type[t], session: Session, **kwargs) -> t:
+    def create(cls: type[t], session: Session, **kwargs) -> t:
         entry = cls(**kwargs)
         session.add(entry)
         session.flush()
@@ -96,7 +85,7 @@ class ModBase:
         return select(cls).filter_by(**kwargs).order_by(*order_by)
 
     @classmethod
-    def find_first_by_kwargs(cls: Type[t], session, *order_by, **kwargs) -> t | None:
+    def find_first_by_kwargs(cls: type[t], session, *order_by, **kwargs) -> t | None:
         return session.get_first(cls.select_by_kwargs(*order_by, **kwargs))
 
     @classmethod
@@ -104,7 +93,7 @@ class ModBase:
         return session.get_first_row(cls.select_by_kwargs(*order_by, **kwargs))
 
     @classmethod
-    def find_all_by_kwargs(cls: Type[t], session, *order_by, **kwargs) -> list[t]:
+    def find_all_by_kwargs(cls: type[t], session, *order_by, **kwargs) -> list[t]:
         return session.get_all(cls.select_by_kwargs(*order_by, **kwargs))
 
     @classmethod
@@ -112,12 +101,20 @@ class ModBase:
         return session.get_all_rows(cls.select_by_kwargs(*order_by, **kwargs))
 
     @classmethod
-    def find_paginated_by_kwargs(cls: Type[t], session, offset: int, limit: int, *order_by, **kwargs) -> list[t]:
-        return session.get_paginated(cls.select_by_kwargs(*order_by, **kwargs), offset, limit)
+    def find_paginated_by_kwargs(
+        cls: type[t], session, offset: int, limit: int, *order_by, **kwargs
+    ) -> list[t]:
+        return session.get_paginated(
+            cls.select_by_kwargs(*order_by, **kwargs), offset, limit
+        )
 
     @classmethod
-    def find_paginated_rows_by_kwargs(cls, session, offset: int, limit: int, *order_by, **kwargs) -> list[Row]:
-        return session.get_paginated_rows(cls.select_by_kwargs(*order_by, **kwargs), offset, limit)
+    def find_paginated_rows_by_kwargs(
+        cls, session, offset: int, limit: int, *order_by, **kwargs
+    ) -> list[Row]:
+        return session.get_paginated_rows(
+            cls.select_by_kwargs(*order_by, **kwargs), offset, limit
+        )
 
     # TODO find_by_... with reflection or metaclasses
 
@@ -126,6 +123,6 @@ class ModBase:
         session.flush()
 
 
-def create_base(meta: MetaData) -> Type[ModBase]:
+def create_base(meta: MetaData) -> type[ModBase]:
     # noinspection PyTypeChecker
     return declarative_base(metadata=meta, cls=ModBase, metaclass=ModBaseMeta)
