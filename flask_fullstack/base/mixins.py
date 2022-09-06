@@ -10,25 +10,51 @@ from ..utils import get_or_pop
 
 
 class AbstractAbortMixin:
-    def abort(self, error_code: int | str, description: str, *, critical: bool = False, **kwargs):
+    def abort(
+        self,
+        error_code: int | str,
+        description: str,
+        *,
+        critical: bool = False,
+        **kwargs,
+    ):
         raise NotImplementedError
 
-    def doc_abort(self, error_code: int | str, description: str, *, critical: bool = False):
+    def doc_abort(
+        self,
+        error_code: int | str,
+        description: str,
+        *,
+        critical: bool = False,
+    ):
         raise NotImplementedError
 
-    def doc_aborts(self, *responses: tuple[int | str, str] | tuple[int | str, str, bool]):
+    def doc_aborts(
+        self,
+        *responses: tuple[int | str, str] | tuple[int | str, str, bool],
+    ):
         def doc_aborts_wrapper(function):
             for response in responses:
                 function = self.doc_abort(
-                    response[0], response[1], critical=response[2] if len(response) == 3 else False)(function)
+                    response[0],
+                    response[1],
+                    critical=response[2] if len(response) == 3 else False,
+                )(function)
             return function
 
         return doc_aborts_wrapper
 
 
 class DatabaseSearcherMixin(AbstractAbortMixin, metaclass=ABCMeta):
-    def database_searcher(self, identifiable: type[Identifiable], *, input_field_name: str = None,
-                          result_field_name: str = None, check_only: bool = False, error_code: int | str = " 404"):
+    def database_searcher(
+        self,
+        identifiable: type[Identifiable],
+        *,
+        input_field_name: str = None,
+        result_field_name: str = None,
+        check_only: bool = False,
+        error_code: int | str = " 404",
+    ):
         """
         - Uses incoming id argument to find something :class:`Identifiable` in the database.
         - If the entity wasn't found, will return a 404 response, which is documented automatically.
@@ -46,7 +72,8 @@ class DatabaseSearcherMixin(AbstractAbortMixin, metaclass=ABCMeta):
         if result_field_name is None:
             result_field_name = identifiable.__name__.lower()
 
-        int_error_code: int = int(error_code)  # TODO redo doc_abort to handle this automagically
+        int_error_code: int = int(error_code)
+        # TODO redo doc_abort & abort to handle this automagically
 
         def searcher_wrapper(function):
             @self.doc_abort(error_code, identifiable.not_found_text, critical=True)
@@ -69,7 +96,7 @@ class DatabaseSearcherMixin(AbstractAbortMixin, metaclass=ABCMeta):
 class JWTAuthorizerMixin(AbstractAbortMixin, metaclass=ABCMeta):
     auth_errors: list[tuple[int | str, str, bool]] = [
         ("401 ", "JWTError", True),
-        ("422 ", "InvalidJWT", True)
+        ("422 ", "InvalidJWT", True),
     ]
 
     def _get_identity(self) -> dict | None:
@@ -90,8 +117,15 @@ class JWTAuthorizerMixin(AbstractAbortMixin, metaclass=ABCMeta):
     def with_optional_jwt(**kwargs):
         return jwt_required(optional=True, **kwargs)
 
-    def jwt_authorizer(self, role: type[UserRole], auth_name: str = "", *, result_field_name: str = None,
-                       optional: bool = False, check_only: bool = False):
+    def jwt_authorizer(
+        self,
+        role: type[UserRole],
+        auth_name: str = "",
+        *,
+        result_field_name: str = None,
+        optional: bool = False,
+        check_only: bool = False,
+    ):
         """
         - Authorizes user by JWT-token.
         - If token is missing or is not processable, falls back on flask-jwt-extended error handlers.
@@ -116,7 +150,10 @@ class JWTAuthorizerMixin(AbstractAbortMixin, metaclass=ABCMeta):
             @jwt_required(optional=optional)
             @wraps(function)
             def authorizer_inner(*args, **kwargs):
-                if (t := self._get_identity()) is None or (identity := t.get(auth_name, None)) is None:
+                if (
+                    (t := self._get_identity()) is None
+                    or (identity := t.get(auth_name, None)) is None
+                ):
                     if optional:
                         kwargs[role.__name__.lower()] = None
                         return function(*args, **kwargs)

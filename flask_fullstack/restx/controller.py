@@ -4,9 +4,19 @@ from collections.abc import Callable, Sequence
 from functools import wraps
 
 from flask import jsonify
-from flask_jwt_extended import unset_jwt_cookies, set_access_cookies, create_access_token, jwt_required
+from flask_jwt_extended import (
+    unset_jwt_cookies,
+    set_access_cookies,
+    create_access_token,
+    jwt_required,
+)
 from flask_restx import Namespace, Model as BaseModel, abort as default_abort
-from flask_restx.fields import List as ListField, Boolean as BoolField, Integer as IntegerField, Nested
+from flask_restx.fields import (
+    List as ListField,
+    Boolean as BoolField,
+    Integer as IntegerField,
+    Nested,
+)
 from flask_restx.marshalling import marshal
 from flask_restx.reqparse import RequestParser
 from flask_restx.utils import unpack, merge
@@ -25,17 +35,48 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
     modifying responses and automatic updates to the Swagger documentation where possible
     """
 
-    def __init__(self, name: str, *, description: str = None, path: str = None, decorators=None,
-                 validate=None, authorizations=None, ordered: bool = False, **kwargs):
-        super().__init__(name, description, path, decorators, validate, authorizations, ordered, **kwargs)
+    def __init__(
+        self,
+        name: str,
+        *,
+        description: str = None,
+        path: str = None,
+        decorators=None,
+        validate=None,
+        authorizations=None,
+        ordered: bool = False,
+        **kwargs,
+    ):
+        super().__init__(
+            name,
+            description,
+            path,
+            decorators,
+            validate,
+            authorizations,
+            ordered,
+            **kwargs,
+        )
 
     def abort(self, code: int, message: str = None, **kwargs):
         default_abort(code, message, **kwargs)
 
-    def doc_abort(self, error_code: int | str, description: str, *, critical: bool = False):
-        return self.response(*ResponseDoc.error_response(error_code, description).get_args())
+    def doc_abort(
+        self,
+        error_code: int | str,
+        description: str,
+        *,
+        critical: bool = False,
+    ):
+        response = ResponseDoc.error_response(error_code, description)
+        return self.response(*response.get_args())
 
-    def add_authorization(self, response, auth_agent: UserRole, auth_name: str = None) -> None:
+    def add_authorization(
+        self,
+        response,
+        auth_agent: UserRole,
+        auth_name: str = None,
+    ) -> None:
         jwt = self._get_identity()
         if jwt is None:
             jwt = {}
@@ -91,8 +132,11 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
             def argument_inner(*args, **kwargs):
                 kwargs.update(parser.parse_args())
                 if use_undefined:
-                    kwargs.update({args.dest or args.name: Undefined for args in parser.args
-                                   if (args.dest or args.name) not in kwargs.keys()})
+                    kwargs.update({
+                        args.dest or args.name: Undefined
+                        for args in parser.args
+                        if (args.dest or args.name) not in kwargs.keys()
+                    })
                 return function(*args, **kwargs)
 
             return argument_inner
@@ -101,10 +145,12 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
     def doc_file_param(self, field_name: str):  # redo...
         def doc_file_param_wrapper(function):
-            return self.doc(**{
-                "params": {field_name: {"in": "formData", "type": "file"}},
-                "consumes": "multipart/form-data"
-            })(function)
+            return self.doc(
+                **{
+                    "params": {field_name: {"in": "formData", "type": "file"}},
+                    "consumes": "multipart/form-data",
+                }
+            )(function)
 
         return doc_file_param_wrapper
 
@@ -128,7 +174,14 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
             return [fields.convert(d, **context) for d in result]
         return fields.convert(result, **context)
 
-    def marshal_with(self, fields: BaseModel | type[Model], as_list=False, skip_none=True, *args, **kwargs):
+    def marshal_with(
+        self,
+        fields: BaseModel | type[Model],
+        as_list=False,
+        skip_none=True,
+        *args,
+        **kwargs,
+    ):
         result = super().marshal_with
 
         if isinstance(fields, type) and issubclass(fields, Model):
@@ -141,7 +194,11 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
                     result = function(*args, **kwargs)
                     if isinstance(result, tuple):
                         result, code, headers = unpack(result)
-                        return self._marshal_result(result, fields, as_list, **kwargs), code, headers
+                        return (
+                            self._marshal_result(result, fields, as_list, **kwargs),
+                            code,
+                            headers,
+                        )
                     return self._marshal_result(result, fields, as_list, **kwargs)
 
                 return marshal_with_inner
@@ -159,16 +216,19 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
             fields = self.models.get(fields.name, None) or self.model(model=fields)
         return marshal(data, fields, *args, **kwargs)
 
-    def marshal_with_authorization(self, fields: BaseModel | type[Model], as_list: bool = False,
-                                   auth_name: str = None, **kwargs):
+    def marshal_with_authorization(
+        self,
+        fields: BaseModel | type[Model],
+        as_list: bool = False,
+        auth_name: str = None,
+        **kwargs,
+    ):
         model = self.models.get(fields.name, None) or self.model(model=fields)
 
         def marshal_with_authorization_wrapper(function):
             doc = {
                 "responses": {
-                    "200": (None, [model], kwargs)
-                    if as_list
-                    else (None, model, kwargs)
+                    "200": (None, [model], kwargs) if as_list else (None, model, kwargs)
                 },
                 "__mask__": kwargs.get(
                     "mask", True
@@ -180,7 +240,9 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
             def marshal_with_authorization_inner(*args, **kwargs):
                 response, result, headers = unpack(function(*args, **kwargs))
                 if isinstance(result, UserRole):  # TODO passthrough for headers
-                    response = jsonify(self.marshal(response, fields, skip_none=True, context=kwargs))
+                    response = jsonify(
+                        self.marshal(response, fields, skip_none=True, context=kwargs)
+                    )
                     self.add_authorization(response, result, auth_name)
                     return response
                 return response, result, headers
@@ -189,8 +251,14 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
         return marshal_with_authorization_wrapper
 
-    def lister(self, per_request: int, marshal_model: BaseModel | type[Model], skip_none: bool = True,
-               count_all: Callable[..., int] | None = None, provided_total: bool = False):
+    def lister(
+        self,
+        per_request: int,
+        marshal_model: BaseModel | type[Model],
+        skip_none: bool = True,
+        count_all: Callable[..., int] | None = None,
+        provided_total: bool = False,
+    ):
         """
         - Used for organising pagination.
         - Uses `counter` form incoming arguments for the decorated function and `per_request` argument
@@ -212,7 +280,10 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
             name = marshal_model.name
             model = marshal_model
 
-        response = {"results": ListField(Nested(model), max_items=per_request), "has-next": BoolField}
+        response = {
+            "results": ListField(Nested(model), max_items=per_request),
+            "has-next": BoolField,
+        }
         if count_all is not None or provided_total:
             response["total"] = IntegerField
         response = BaseModel(f"List" + name, response)
@@ -240,8 +311,14 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
                     result_list.pop()
 
                 if isinstance(marshal_model, type) and issubclass(marshal_model, Model):
-                    result_list = [marshal_model.convert(result, **kwargs) for result in result_list]
-                result = {"results": marshal(result_list, model, skip_none=skip_none), "has-next": has_next}
+                    result_list = [
+                        marshal_model.convert(result, **kwargs)
+                        for result in result_list
+                    ]
+                result = {
+                    "results": marshal(result_list, model, skip_none=skip_none),
+                    "has-next": has_next,
+                }
                 if count_all is not None:
                     result["total"] = count_all(*args, **kwargs)
                 if provided_total:

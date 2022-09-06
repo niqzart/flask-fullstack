@@ -8,8 +8,15 @@ from datetime import datetime, date, time
 from typing import get_type_hints, TypeVar, ForwardRef
 
 from flask_restx import Model as _Model, Namespace
-from flask_restx.fields import (Boolean as BooleanField, Integer as IntegerField, Float as FloatField,
-                                String as StringField, Raw as RawField, Nested as NestedField, List as ListField, )
+from flask_restx.fields import (
+    Boolean as BooleanField,
+    Integer as IntegerField,
+    Float as FloatField,
+    String as StringField,
+    Raw as RawField,
+    Nested as NestedField,
+    List as ListField,
+)
 from flask_restx.reqparse import RequestParser
 from pydantic import BaseModel
 from pydantic.fields import ModelField
@@ -105,11 +112,18 @@ column_to_type: dict[type[TypeEngine], type] = {
 
 
 def pydantic_field_to_kwargs(field: ModelField) -> dict[str, ...]:
-    return {"default": field.default, "required": field.required, "allow_null": not field.required}
+    return {
+        "default": field.default,
+        "required": field.required,
+        "allow_null": not field.required,
+    }
 
 
 def sqlalchemy_column_to_kwargs(column: Column) -> dict[str, ...] | None:
-    result: dict[str, ...] = {"default": column.default, "required": not column.nullable and column.default is None}
+    result: dict[str, ...] = {
+        "default": column.default,
+        "required": not column.nullable and column.default is None,
+    }
 
     for supported_type, type_ in column_to_field.items():
         if isinstance(column.type, supported_type):
@@ -125,7 +139,11 @@ def sqlalchemy_column_to_kwargs(column: Column) -> dict[str, ...] | None:
 flask_restx_has_bad_design: Namespace = Namespace("this-is-dumb")
 
 
-def move_field_attribute(root_name: str, field_name: str, field_def: type[RawField] | RawField):
+def move_field_attribute(
+    root_name: str,
+    field_name: str,
+    field_def: type[RawField] | RawField,
+):
     attribute_name: str = f"{root_name}.{field_name}"
     if isinstance(field_def, type):
         return field_def(attribute=attribute_name)
@@ -133,9 +151,20 @@ def move_field_attribute(root_name: str, field_name: str, field_def: type[RawFie
     return field_def
 
 
-def create_fields(column: Column, name: str, use_defaults: bool = False, flatten_jsons: bool = False,
-                  required: bool = None, attribute: str = None) -> dict[str, ...]:
-    if not use_defaults or column.default is None or column.nullable or isinstance(column.default, Sequence):
+def create_fields(
+    column: Column,
+    name: str,
+    use_defaults: bool = False,
+    flatten_jsons: bool = False,
+    required: bool = None,
+    attribute: str = None,
+) -> dict[str, ...]:
+    if (
+        not use_defaults
+        or column.default is None
+        or column.nullable
+        or isinstance(column.default, Sequence)
+    ):
         default = None
         required = required or not column.nullable
     else:
@@ -148,18 +177,27 @@ def create_fields(column: Column, name: str, use_defaults: bool = False, flatten
     else:
         raise TypeError(f"{column.type} is not supported")
 
-    kwargs = {"attribute": attribute or column.name, "default": default, "required": required}
+    kwargs = {
+        "attribute": attribute or column.name,
+        "default": default,
+        "required": required,
+    }
     if issubclass(field_type, JSONWithModelField):
         json_type: JSONWithModel = column.type
 
         if flatten_jsons and not json_type.as_list:
             root_name: str = name
-            return {k: move_field_attribute(root_name, k, v) for k, v in json_type.model.items()}
+            return {
+                k: move_field_attribute(root_name, k, v)
+                for k, v in json_type.model.items()
+            }
 
         field = json_type.model
         if isinstance(json_type.model, dict):
-            field = NestedField(flask_restx_has_bad_design.model(json_type.model_name, field),
-                                **({} if column.type.as_list else kwargs))
+            field = NestedField(
+                flask_restx_has_bad_design.model(json_type.model_name, field),
+                **({} if column.type.as_list else kwargs),
+            )
         if column.type.as_list:
             field = ListField(field, **kwargs)
         # field: RawField = field_type.create(column, column_type, default)
@@ -175,6 +213,7 @@ def create_fields(column: Column, name: str, use_defaults: bool = False, flatten
     return {name: field}
 
 
+# fmt: off
 @dataclass()
 class LambdaFieldDef:
     """
@@ -292,6 +331,7 @@ class ResponseDoc:
         if self.model is None:
             return self.code, self.description
         return self.code, self.description, self.model
+# fmt: on
 
 
 t = TypeVar("t", bound="Model")
@@ -299,15 +339,23 @@ Undefined = object()
 
 
 class Model(Nameable):
-    """ A base class for models
+    """A base class for models
     Can be combined with dataclasses, Pydantic or Marshmallow to define fields
     Instances will be passed as data for flask_restx's marshal function
     """
 
     @staticmethod
-    def include_columns(*columns: Column, _use_defaults: bool = False, _flatten_jsons: bool = False,
-                        _require_all: bool = None, **named_columns: Column) -> Callable[[type[t]], type[t]]:
-        named_columns = {key.replace("_", "-"): value for key, value in named_columns.items()}
+    def include_columns(
+        *columns: Column,
+        _use_defaults: bool = False,
+        _flatten_jsons: bool = False,
+        _require_all: bool = None,
+        **named_columns: Column,
+    ) -> Callable[[type[t]], type[t]]:
+        named_columns = {
+            key.replace("_", "-"): value
+            for key, value in named_columns.items()
+        }
 
         # TODO allow different cases
 
@@ -326,10 +374,21 @@ class Model(Nameable):
                     if not cls.__columns_converted__:
                         if hasattr(super(), "convert_columns"):
                             super().convert_columns()  # noqa
-                        named_columns.update({column.name.replace("_", "-"): column for column in columns})
+                        named_columns.update({
+                            column.name.replace("_", "-"): column
+                            for column in columns
+                        })
                         for name, column in named_columns.items():
                             fields.update(
-                                create_fields(column, name, _use_defaults, _flatten_jsons, _require_all, name))
+                                create_fields(
+                                    column,
+                                    name,
+                                    _use_defaults,
+                                    _flatten_jsons,
+                                    _require_all,
+                                    name,
+                                )
+                            )
                         cls.__columns_converted__ = True
 
                 # TODO make model's ORM attributes usable (__init__?)
@@ -339,7 +398,11 @@ class Model(Nameable):
                     cls.convert_columns()
                     result: cls = super().convert_one(orm_object, **context)
                     for name, column in named_columns.items():
-                        object.__setattr__(result, name, getattr(orm_object, column.name or name.replace("-", "_")))
+                        object.__setattr__(
+                            result,
+                            name,
+                            getattr(orm_object, column.name or name.replace("-", "_")),
+                        )
                     return result
 
                 @classmethod
@@ -355,7 +418,11 @@ class Model(Nameable):
                         # value = data.get(name, Undefined)
                         # if value is not Undefined:
                         #     object.__setattr__(result, column.name, value)
-                        object.__setattr__(result, column.name, data.get(name, column.default))
+                        object.__setattr__(
+                            result,
+                            column.name,
+                            data.get(name, column.default),
+                        )
                     return result
 
                 @classmethod
@@ -363,9 +430,16 @@ class Model(Nameable):
                     cls.convert_columns()
                     result: RequestParser = super().parser(**kwargs)
                     for name, column in named_columns.items():
-                        data: dict[str, ...] | None = sqlalchemy_column_to_kwargs(column)
+                        data: dict[str, ...] | None = sqlalchemy_column_to_kwargs(
+                            column
+                        )
                         if data is not None:
-                            result.add_argument(name, dest=column.name, **data, **kwargs)
+                            result.add_argument(
+                                name,
+                                dest=column.name,
+                                **data,
+                                **kwargs,
+                            )
                     return result
 
             return ModModel
@@ -373,7 +447,12 @@ class Model(Nameable):
         return include_columns_inner
 
     @classmethod
-    def named_column_model(cls: type[t], _name: str, *columns: Column, **kwargs) -> type[t]:
+    def named_column_model(
+        cls: type[t],
+        _name: str,
+        *columns: Column,
+        **kwargs,
+    ) -> type[t]:
         @cls.include_columns(*columns, **kwargs)
         class ModModel(cls):
             name = _name
@@ -390,8 +469,14 @@ class Model(Nameable):
         return ModModel
 
     @staticmethod
-    def include_nest_model(model: type[Model], field_name: str, parameter_name: str = None, as_list: bool = False,
-                           required: bool = True, skip_none: bool = True) -> Callable[[type[t]], type[t]]:
+    def include_nest_model(
+        model: type[Model],
+        field_name: str,
+        parameter_name: str = None,
+        as_list: bool = False,
+        required: bool = True,
+        skip_none: bool = True,
+    ) -> Callable[[type[t]], type[t]]:
         if parameter_name is None:
             parameter_name = field_name
 
@@ -410,10 +495,22 @@ class Model(Nameable):
                     return result
 
                 @classmethod
-                def model(cls) -> dict[str, RawField]:  # TODO workaround, replace with recursive registration
-                    return dict(super().model(), **{field_name: NestedField(
-                        flask_restx_has_bad_design.model(name=model.name, model=model.model()),
-                        required=required, as_list=as_list, allow_null=not required, skip_none=skip_none)})
+                def model(cls) -> dict[str, RawField]:
+                    # TODO workaround, replace with recursive registration
+                    return dict(
+                        super().model(),
+                        **{
+                            field_name: NestedField(
+                                flask_restx_has_bad_design.model(
+                                    name=model.name, model=model.model()
+                                ),
+                                required=required,
+                                as_list=as_list,
+                                allow_null=not required,
+                                skip_none=skip_none,
+                            )
+                        },
+                    )
 
                 @classmethod
                 def deconvert_one(cls: type[t], data: dict[str, ...]) -> t:
@@ -430,16 +527,33 @@ class Model(Nameable):
         return include_nest_model_inner
 
     @classmethod
-    def nest_model(cls, model: type[Model], field_name: str, parameter_name: str = None,
-                   as_list: bool = False, required: bool = True, skip_none: bool = True) -> type[t]:
-        @cls.include_nest_model(model, field_name, parameter_name, as_list, required, skip_none)
+    def nest_model(
+        cls,
+        model: type[Model],
+        field_name: str,
+        parameter_name: str = None,
+        as_list: bool = False,
+        required: bool = True,
+        skip_none: bool = True,
+    ) -> type[t]:
+        @cls.include_nest_model(
+            model,
+            field_name,
+            parameter_name,
+            as_list,
+            required,
+            skip_none,
+        )
         class ModModel(cls):
             pass
 
         return ModModel
 
     @staticmethod
-    def include_flat_nest_model(model: type[Model], parameter_name: str) -> Callable[[type[t]], type[t]]:
+    def include_flat_nest_model(
+        model: type[Model],
+        parameter_name: str,
+    ) -> Callable[[type[t]], type[t]]:
         def include_flat_nest_model_inner(cls: type[t]) -> type[t]:
             class ModModel(cls):
                 @classmethod
@@ -449,7 +563,11 @@ class Model(Nameable):
                     if nested is not None:
                         nested = model.convert_one(nested, **context)
                         for field_name in model.model():
-                            object.__setattr__(result, field_name, getattr(nested, field_name, None))
+                            object.__setattr__(
+                                result,
+                                field_name,
+                                getattr(nested, field_name, None),
+                            )
                     return result
 
                 @classmethod
@@ -458,7 +576,9 @@ class Model(Nameable):
 
                 @classmethod
                 def deconvert_one(cls: type[t], data: dict[str, ...]) -> t:
-                    raise NotImplementedError("Inner flattened model deconverting is not supported yet")
+                    raise NotImplementedError(
+                        "Inner flattened model deconverting is not supported yet"
+                    )
 
                 @classmethod
                 def parser(cls, **kwargs) -> RequestParser:
@@ -496,18 +616,19 @@ class Model(Nameable):
 
         return ModModel
 
-    @staticmethod
-    def include_context(*names, **var_types) -> Callable[[type[t]], type[t]]:  # TODO Maybe redo
+    @staticmethod  # TODO Maybe redo
+    def include_context(*names, **var_types) -> Callable[[type[t]], type[t]]:
         var_types.update({name: object for name in names})
 
         def include_context_inner(cls: type[t]) -> type[t]:
             class ModModel(cls):
                 @classmethod
                 def convert_one(cls: type[t], orm_object, **context) -> t:
-                    assert all((value := context.get(name, None)) is not None
-                               and isinstance(value, var_type)
-                               for name, var_type in var_types.items()), \
-                        "Context was not filled properly"  # TODO better error messages!
+                    assert all(
+                        (value := context.get(name, None)) is not None
+                        and isinstance(value, var_type)
+                        for name, var_type in var_types.items()
+                    ), "Context was not filled properly"  # TODO better error messages!
                     return super().convert_one(orm_object, **context)
 
             return ModModel
@@ -552,10 +673,16 @@ class PydanticModel(BaseModel, Model, ABC):
 
         kwargs = pydantic_field_to_kwargs(field)
         if issubclass(field.type_, Model):
-            result = NestedField(flask_restx_has_bad_design.model(field.type_.name, field.type_.model()), **kwargs)
+            result = NestedField(
+                flask_restx_has_bad_design.model(field.type_.name, field.type_.model()),
+                **kwargs,
+            )
         elif issubclass(field.type_, TypeEnum):
-            result = StringField(attribute=lambda x: getattr(x, field.name).to_string(),
-                                 enum=field.type_.get_all_field_names(), **kwargs)
+            result = StringField(
+                attribute=lambda x: getattr(x, field.name).to_string(),
+                enum=field.type_.get_all_field_names(),
+                **kwargs,
+            )
         else:
             result = type_to_field[field.type_](**kwargs)
 
@@ -566,8 +693,10 @@ class PydanticModel(BaseModel, Model, ABC):
 
     @classmethod
     def model(cls) -> dict[str, RawField]:
-        return {field.alias.replace("_", "-"): PydanticModel.pydantic_to_restx_field(field)
-                for name, field in cls.__fields__.items()}
+        return {
+            field.alias.replace("_", "-"): PydanticModel.pydantic_to_restx_field(field)
+            for name, field in cls.__fields__.items()
+        }
 
     @classmethod
     def parser(cls, **kwargs) -> RequestParser:
@@ -576,10 +705,15 @@ class PydanticModel(BaseModel, Model, ABC):
         for name, field in cls.__fields__.items():
             if field.type_ is not field.outer_type_:
                 kwargs["action"] = "append"
-            elif field.is_complex():
-                raise ValueError("Nested structures are not supported")  # TODO flat-nested fields support
-            parser.add_argument(field.alias.replace("_", "-"), dest=name, type=field.type_,
-                                **pydantic_field_to_kwargs(field), **kwargs)
+            elif field.is_complex():  # TODO flat-nested fields support
+                raise ValueError("Nested structures are not supported")
+            parser.add_argument(
+                field.alias.replace("_", "-"),
+                dest=name,
+                type=field.type_,
+                **pydantic_field_to_kwargs(field),
+                **kwargs,
+            )
         return parser
 
     @classmethod

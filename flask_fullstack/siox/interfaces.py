@@ -26,14 +26,18 @@ class EventGroupBase:
         return bound_model.__name__
 
     def _get_model_schema(self, bound_model: type[BaseModel]):
-        return {"payload": bound_model.schema(ref_template="#/components/messages/{model}")}
+        return {
+            "payload": bound_model.schema(ref_template="#/components/messages/{model}")
+        }
 
     def _bind_model(self, bound_model: type[BaseModel]):
         self.bound_models.append(bound_model)
 
     def extract_doc_messages(self) -> OrderedDict[str, ...]:
-        return OrderedDict((self._get_model_name(bound_model), self._get_model_schema(bound_model))
-                           for bound_model in self.bound_models)
+        return OrderedDict(
+            (self._get_model_name(bound_model), self._get_model_schema(bound_model))
+            for bound_model in self.bound_models
+        )
 
     def _get_event_name(self, event: BaseEvent):
         if self.use_kebab_case:
@@ -44,7 +48,10 @@ class EventGroupBase:
         return event.create_doc(self.namespace or "/")
 
     def extract_doc_channels(self) -> OrderedDict[str, ...]:
-        return OrderedDict((self._get_event_name(event), self._create_doc(event)) for event in self.bound_events)
+        return OrderedDict(
+            (self._get_event_name(event), self._create_doc(event))
+            for event in self.bound_events
+        )
 
     def extract_handlers(self) -> Iterable[tuple[str, Callable]]:
         for event in self.bound_events:

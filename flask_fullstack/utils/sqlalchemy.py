@@ -5,7 +5,12 @@ from typing import TypeVar
 
 from sqlalchemy import MetaData, select
 from sqlalchemy.engine import Row
-from sqlalchemy.orm import sessionmaker, declarative_base, Session as _Session, DeclarativeMeta
+from sqlalchemy.orm import (
+    sessionmaker,
+    declarative_base,
+    Session as _Session,
+    DeclarativeMeta,
+)
 from sqlalchemy.sql import Select
 
 from .named import NamedPropertiesMeta
@@ -35,7 +40,7 @@ class Session(_Session):
 
 class Sessionmaker(sessionmaker):
     def with_begin(self, function):
-        """ Wraps the function with Session.begin() and passes session object to the decorated function """
+        """Wraps the function with Session.begin() and passes session object to the decorated function"""
 
         @wraps(function)
         def with_begin_inner(*args, **kwargs):
@@ -48,7 +53,7 @@ class Sessionmaker(sessionmaker):
         return with_begin_inner
 
     def with_autocommit(self, function):
-        """ Wraps the function with Session.begin() for automatic commits after the decorated function """
+        """Wraps the function with Session.begin() for automatic commits after the decorated function"""
 
         @wraps(function)
         def with_autocommit_inner(*args, **kwargs):
@@ -96,12 +101,20 @@ class ModBase:  # TODO remove session usages?
         return session.get_all_rows(cls.select_by_kwargs(*order_by, **kwargs))
 
     @classmethod
-    def find_paginated_by_kwargs(cls: type[t], session, offset: int, limit: int, *order_by, **kwargs) -> list[t]:
-        return session.get_paginated(cls.select_by_kwargs(*order_by, **kwargs), offset, limit)
+    def find_paginated_by_kwargs(
+        cls: type[t], session, offset: int, limit: int, *order_by, **kwargs
+    ) -> list[t]:
+        return session.get_paginated(
+            cls.select_by_kwargs(*order_by, **kwargs), offset, limit
+        )
 
     @classmethod
-    def find_paginated_rows_by_kwargs(cls, session, offset: int, limit: int, *order_by, **kwargs) -> list[Row]:
-        return session.get_paginated_rows(cls.select_by_kwargs(*order_by, **kwargs), offset, limit)
+    def find_paginated_rows_by_kwargs(
+        cls, session, offset: int, limit: int, *order_by, **kwargs
+    ) -> list[Row]:
+        return session.get_paginated_rows(
+            cls.select_by_kwargs(*order_by, **kwargs), offset, limit
+        )
 
     # TODO find_by_... with reflection or metaclasses
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from sqlalchemy import select, event
+from sqlalchemy import select
+from sqlalchemy.event import listen
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql import Select
 from whooshalchemy import Searcher as SearcherBase, IndexService as IndexServiceBase
@@ -9,11 +10,10 @@ from whooshalchemy import Searcher as SearcherBase, IndexService as IndexService
 class IndexService(IndexServiceBase):
     def __init__(self, config=None, session=None, whoosh_base=None):
         super().__init__(config, session, whoosh_base)
+        for event in ("before_flush", "after_flush"):
+            listen(Session, event, lambda session, *_: self.before_commit(session))
 
-        event.listen(Session, "before_flush", lambda session, *_: self.before_commit(session))
-        event.listen(Session, "after_flush", lambda session, *_: self.after_commit(session))
-
-    def register_as_searchable(self, *searchable: str):  # TODO whoosh specific, move
+    def register_as_searchable(self, *searchable: str):
         """
         - Registers database model as searchable with whoosh-sqlalchemy.
         - Adds ``search_stmt`` field (:class:`Searcher`) to the class for searching.
@@ -26,7 +26,11 @@ class IndexService(IndexServiceBase):
             self.register_class(model)
 
             searcher = model.search_query
-            model.search_stmt = Searcher(searcher.model_class, searcher.primary, searcher.index)
+            model.search_stmt = Searcher(
+                searcher.model_class,
+                searcher.primary,
+                searcher.index,
+            )
 
             return model
 

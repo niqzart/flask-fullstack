@@ -33,8 +33,14 @@ class EventGroup(EventGroupBase):  # DEPRECATED
 
         return bind_pub_wrapper
 
-    def bind_pub(self, model: type[BaseModel], ack_model: type[BaseModel] = None, *, description: str = None,
-                 name: str = None) -> Callable[[Callable], ClientEvent]:
+    def bind_pub(
+        self,
+        model: type[BaseModel],
+        ack_model: type[BaseModel] = None,
+        *,
+        description: str = None,
+        name: str = None,
+    ) -> Callable[[Callable], ClientEvent]:
         if self.use_kebab_case and name is not None:
             name = name.replace("_", "-")
         return self.bind_pub_full(self.ClientEvent(model, ack_model, name, description))
@@ -47,13 +53,23 @@ class EventGroup(EventGroupBase):  # DEPRECATED
         self._bind_model(event.model)
         return event
 
-    def bind_sub(self, model: type[BaseModel], *, description: str = None, name: str = None) -> ServerEvent:
+    def bind_sub(
+        self,
+        model: type[BaseModel],
+        *,
+        description: str = None,
+        name: str = None,
+    ) -> ServerEvent:
         if self.use_kebab_case and name is not None:
             name = name.replace("_", "-")
         return self.bind_sub_full(self.ServerEvent(model, name, description))
 
-    def bind_dup_full(self, event: DuplexEvent, same_model: bool = True,
-                      use_event: bool = None) -> Callable[[Callable], DuplexEvent]:
+    def bind_dup_full(
+        self,
+        event: DuplexEvent,
+        same_model: bool = True,
+        use_event: bool = None,
+    ) -> Callable[[Callable], DuplexEvent]:
         if use_event is None:
             use_event = False
         if self.namespace is not None:
@@ -70,7 +86,11 @@ class EventGroup(EventGroupBase):  # DEPRECATED
                 args = list(args[:-1])
                 if use_event:
                     args.append(event)
-                return function(*args, **event.client_event.model.parse_obj(data).dict(), **kwargs)
+                return function(
+                    *args,
+                    **event.client_event.model.parse_obj(data).dict(),
+                    **kwargs,
+                )
 
             event.client_event.handler = handler
             self._bind_event(event)
@@ -78,9 +98,16 @@ class EventGroup(EventGroupBase):  # DEPRECATED
 
         return bind_dup_wrapper
 
-    def bind_dup(self, model: type[BaseModel], server_model: type[BaseModel] = None,
-                 ack_model: type[BaseModel] = None, *, description: str = None,
-                 name: str = None, use_event: bool = None) -> Callable[[Callable], DuplexEvent]:
+    def bind_dup(
+        self,
+        model: type[BaseModel],
+        server_model: type[BaseModel] = None,
+        ack_model: type[BaseModel] = None,
+        *,
+        description: str = None,
+        name: str = None,
+        use_event: bool = None,
+    ) -> Callable[[Callable], DuplexEvent]:
         if self.use_kebab_case and name is not None:
             name = name.replace("_", "-")
 
@@ -95,6 +122,6 @@ class EventGroup(EventGroupBase):  # DEPRECATED
         event = self.DuplexEvent(
             self.ClientEvent(model, ack_model, name, description),
             self.ServerEvent(server_model, name, description),
-            description=description
+            description=description,
         )
         return self.bind_dup_full(event, same_model, use_event)
