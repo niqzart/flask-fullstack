@@ -100,8 +100,6 @@ class Flask(_Flask):
         self.config["JWT_ACCESS_TOKEN_EXPIRES"] = access_expires
         self.config["JWT_BLACKLIST_TOKEN_CHECKS"] = ["access"]
 
-        jwt = JWTManager(self)
-
         @self.after_request
         def refresh_expiring_jwt(response: Response):
             try:
@@ -116,7 +114,7 @@ class Flask(_Flask):
             except (RuntimeError, KeyError):
                 return response
 
-        return jwt
+        return JWTManager(self)
 
     def configure_jwt_with_loaders(
         self,

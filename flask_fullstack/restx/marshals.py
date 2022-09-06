@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from collections import OrderedDict
-from collections.abc import Sequence, Callable
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, date, time
 from typing import get_type_hints, TypeVar, ForwardRef
@@ -59,25 +59,8 @@ class JSONLoadableField(RawField):
 #         raise NotImplementedError
 
 
-class JSONWithModelField:  # (ConfigurableField):
-    # @classmethod
-    # def create(cls, column: Column, *_) -> RawField:
-    #     field = NestedField(flask_restx_has_bad_design.model(column.type.model_name, column.type.model))
-    #     if column.type.as_list:
-    #         return ListField(field)
-    #     return field
+class JSONWithModelField:
     pass
-
-
-# class JSONWithSchemaField(ConfigurableField):
-#     @classmethod
-#     def create(cls, column: Column, column_type: JSONWithSchema, default=None) -> type[JSONLoadableField]:
-#         class JSONField(JSONLoadableField):
-#             __schema_type__ = column.type.schema_type
-#             __schema_format__ = column.type.schema_format  # doesn't work!
-#             __schema_example__ = column.type.schema_example or default
-#
-#         return JSONField
 
 
 type_to_field: dict[type, type[RawField]] = {
@@ -200,7 +183,6 @@ def create_fields(
             )
         if column.type.as_list:
             field = ListField(field, **kwargs)
-        # field: RawField = field_type.create(column, column_type, default)
     else:
         if field_type == EnumField:
             enum = column.type.enum_class
@@ -233,11 +215,12 @@ class LambdaFieldDef:
     name: str | None = None
 
     def to_field(self) -> type[RawField] | RawField:
-        field_type: type[RawField] = RawField
-        for supported_type in type_to_field:
+        field_type: type[RawField]
+        for supported_type, field_type in type_to_field.items():
             if issubclass(self.field_type, supported_type):
-                field_type = type_to_field[supported_type]
                 break
+        else:
+            field_type = RawField
         return field_type(attribute=self.attribute)
 
 
@@ -276,7 +259,7 @@ def create_marshal_model(model_name: str, *fields: str, inherit: str | None = No
         })
 
         cls.marshal_models[model_name] = OrderedDict(sorted(model_dict.items()))
-        if "id" in cls.marshal_models[model_name].keys():
+        if "id" in cls.marshal_models[model_name]:
             cls.marshal_models[model_name].move_to_end("id", last=False)
 
         return cls
@@ -305,7 +288,7 @@ def unite_models(*models: dict[str, type[RawField] | RawField]):
     for model in models:
         model_dict.update(model)
     model_dict = OrderedDict(sorted(model_dict.items()))
-    if "id" in model_dict.keys():
+    if "id" in model_dict:
         model_dict.move_to_end("id", last=False)
     return model_dict
 
@@ -361,7 +344,7 @@ class Model(Nameable):
 
         # TODO Maybe allow *columns: Column to do this here:
         #   (doesn't work for models inside DB classes, as Column.name is populated later)
-        #   named_columns.update({column.name.replace("_", "-"): column for column in columns})
+        #   named_columns.update
 
         def include_columns_inner(cls: type[t]) -> type[t]:
             fields = {}
@@ -415,9 +398,6 @@ class Model(Nameable):
                     cls.convert_columns()
                     result: cls = super().deconvert_one(data)
                     for name, column in named_columns.items():
-                        # value = data.get(name, Undefined)
-                        # if value is not Undefined:
-                        #     object.__setattr__(result, column.name, value)
                         object.__setattr__(
                             result,
                             column.name,
@@ -519,7 +499,7 @@ class Model(Nameable):
                     return result
 
                 @classmethod
-                def parser(cls, **kwargs) -> RequestParser:
+                def parser(cls, **_) -> RequestParser:
                     raise ValueError("Nested structures are not supported")
 
             return ModModel
@@ -581,7 +561,7 @@ class Model(Nameable):
                     )
 
                 @classmethod
-                def parser(cls, **kwargs) -> RequestParser:
+                def parser(cls, **_) -> RequestParser:
                     raise ValueError("Nested structures are not supported")
 
             return ModModel
@@ -731,7 +711,7 @@ class PydanticModel(BaseModel, Model, ABC):
         return cls(**cls.dict_convert(orm_object, **context))
 
     @classmethod
-    def parse_obj(cls: type[t], obj: ...) -> t:
+    def parse_obj(cls: type[t], obj: ...) -> t:  # TODO seems like recursion...
         return cls.deconvert(obj)
 
     @classmethod

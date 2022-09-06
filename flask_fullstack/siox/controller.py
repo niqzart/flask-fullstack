@@ -164,14 +164,14 @@ class EventController(EventGroupBase):
 
     def route(self, cls: type | None = None) -> type:
         # TODO mb move data pre- and post-processing from modes to here
-        def route_inner(cls: type) -> type:
-            for name, value in cls.__dict__.items():
+        def route_inner(klass: type) -> type:
+            for name, value in klass.__dict__.items():
                 if isinstance(value, BaseEvent):
                     if isinstance(value, ClientEvent):
-                        value.handler = self.with_cls(cls, value.handler)
+                        value.handler = self.with_cls(klass, value.handler)
                     elif isinstance(value, DuplexEvent):
                         value.client_event.handler = self.with_cls(
-                            cls, value.client_event.handler
+                            klass, value.client_event.handler
                         )
 
                     if value.name is None:
@@ -182,9 +182,9 @@ class EventController(EventGroupBase):
                         value.attach_namespace(self.namespace)
                     self._bind_event(value)
 
-                setattr(cls, name, value)
+                setattr(klass, name, value)
 
-            return cls
+            return klass
 
         return route_inner if cls is None else route_inner(cls)
 

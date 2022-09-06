@@ -10,8 +10,12 @@ from whooshalchemy import Searcher as SearcherBase, IndexService as IndexService
 class IndexService(IndexServiceBase):
     def __init__(self, config=None, session=None, whoosh_base=None):
         super().__init__(config, session, whoosh_base)
+
+        def wrap_before_commit(session, *_):
+            return self.before_commit(session)
+
         for event in ("before_flush", "after_flush"):
-            listen(Session, event, lambda session, *_: self.before_commit(session))
+            listen(Session, event, wrap_before_commit)
 
     def register_as_searchable(self, *searchable: str):
         """

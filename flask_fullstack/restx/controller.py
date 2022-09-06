@@ -146,10 +146,8 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
     def doc_file_param(self, field_name: str):  # redo...
         def doc_file_param_wrapper(function):
             return self.doc(
-                **{
-                    "params": {field_name: {"in": "formData", "type": "file"}},
-                    "consumes": "multipart/form-data",
-                }
+                params={field_name: {"in": "formData", "type": "file"}},
+                consumes="multipart/form-data",
             )(function)
 
         return doc_file_param_wrapper

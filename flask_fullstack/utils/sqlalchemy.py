@@ -44,7 +44,7 @@ class Sessionmaker(sessionmaker):
 
         @wraps(function)
         def with_begin_inner(*args, **kwargs):
-            if "session" in kwargs.keys():
+            if "session" in kwargs:
                 return function(*args, **kwargs)
             with self.begin() as session:
                 kwargs["session"] = session

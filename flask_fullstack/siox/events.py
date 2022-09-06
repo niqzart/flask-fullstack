@@ -113,9 +113,9 @@ class ClientEvent(Event):
         if isinstance(result, Sequence) and not isinstance(result, str):
             result, code, message = unpack_params(result)
             return render_packed(self._render_model(result), code, message)
-        else:
-            result = self._render_model(result)
-            return self._force_wrap(result) if self.force_wrap else result
+
+        result = self._render_model(result)
+        return self._force_wrap(result) if self.force_wrap else result
 
     def _handler(self, function: Callable[..., dict]):
         if self.forced_ack or self.ack_model is not None:

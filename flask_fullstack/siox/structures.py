@@ -33,7 +33,7 @@ class Namespace(_Namespace):
 
     def on_connect(self, function: Callable[[...], None] | None = None):
         def on_connect_wrapper(function: Callable[[...], None]):
-            setattr(self, f"on_connect", function)
+            self.on_connect = function
 
         if function is None:
             return on_connect_wrapper
@@ -41,7 +41,7 @@ class Namespace(_Namespace):
 
     def on_disconnect(self, function: Callable[[...], None] = None):
         def on_disconnect_wrapper(function: Callable[[...], None]):
-            setattr(self, f"on_disconnect", function)
+            self.on_disconnect = function
 
         if function is None:
             return on_disconnect_wrapper
@@ -102,7 +102,7 @@ class SocketIO(_SocketIO):
         self.doc_path = doc_path
         if remove_ping_pong_logs:
             getLogger("engineio.server").addFilter(NoPingPongFilter())
-        super(SocketIO, self).__init__(app, **kwargs)
+        super().__init__(app, **kwargs)
 
     def docs(self):
         return self.async_api
@@ -114,7 +114,7 @@ class SocketIO(_SocketIO):
         def documentation():
             return self.docs()
 
-        return super(SocketIO, self).init_app(app, **kwargs)
+        return super().init_app(app, **kwargs)
 
     def on_namespace(self, namespace_handler):
         if isinstance(namespace_handler, Namespace):
@@ -122,14 +122,14 @@ class SocketIO(_SocketIO):
             self.async_api["components"]["messages"].update(
                 namespace_handler.doc_messages
             )
-        return super(SocketIO, self).on_namespace(namespace_handler)
+        return super().on_namespace(namespace_handler)
 
     def _add_namespace(self, namespace: Namespace, *event_groups: EventGroupBase):
         for event_group in event_groups:
             namespace.attach_event_group(event_group)
         self.on_namespace(namespace)
 
-    def add_namespace(self, name: str = None, *event_groups: EventGroupBase, **kwargs):
+    def add_namespace(self, name: str = None, *event_groups: EventGroupBase, **_):
         self._add_namespace(
             self.namespace_class(name, self.use_kebab_case),
             *event_groups,

@@ -14,7 +14,6 @@ class Identifiable:
     """
 
     not_found_text: str = ""
-    """ Customizable error message to be used for missing ids """
 
     def __init__(self, **kwargs):
         pass

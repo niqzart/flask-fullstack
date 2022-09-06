@@ -166,9 +166,6 @@ class EventGroupBase(EventGroupBaseMixedIn):
     ServerEvent = ServerEvent
     DuplexEvent = DuplexEvent
 
-    def __init__(self, namespace: str = None, use_kebab_case: bool = False):
-        super().__init__(namespace, use_kebab_case)
-
     def _bind_model(self, bound_model: type[BaseModel]):
         if isinstance(bound_model, type) and issubclass(bound_model, PydanticModel):
             bound_model.Config.title = bound_model.name
@@ -206,7 +203,7 @@ class EventGroupBase(EventGroupBaseMixedIn):
         description: str,
         *,
         critical: bool = False,
-        **kwargs,
+        **_,
     ):
         raise EventException(error_code, description, critical)
 
@@ -229,7 +226,7 @@ class EventController(_EventController, EventGroupBase):
             def marshal_ack_inner(*args, **kwargs):
                 result = function(*args, **kwargs)
                 if not isinstance(result, ack_model):
-                    result = model.convert(result, **kwargs)
+                    return model.convert(result, **kwargs)
                 return result
 
         else:
@@ -300,9 +297,5 @@ class SocketIO(_SocketIO):
         self._add_namespace(namespace, *event_groups)
 
 
-#     def __init__(self, app=None, title: str = "SIO", version: str = "1.0.0", doc_path: str = "/doc/", **kwargs):
-#         super().__init__(app, title, version, doc_path, **kwargs)
-#
-#         @self.on("connect")  # TODO check everytime or save in session?
-#         def connect_user():  # https://python-socketio.readthedocs.io/en/latest/server.html#user-sessions
-#             pass             # sio = main.socketio.server
+# TODO check auth everytime or save in session?
+#   https://python-socketio.readthedocs.io/en/latest/server.html#user-sessions
