@@ -171,18 +171,6 @@ class EventGroupBase(EventGroupBaseMixedIn):
             bound_model.Config.title = bound_model.name
         super()._bind_model(bound_model)
 
-    def doc_abort(
-        self,
-        error_code: int | str,
-        description: str,
-        *,
-        critical: bool = False,
-    ):
-        def doc_abort_wrapper(function):
-            return function
-
-        return doc_abort_wrapper
-
     def _get_model_name(self, bound_model: type[BaseModel]):
         if isinstance(bound_model, type) and issubclass(bound_model, Nameable):
             return bound_model.name or bound_model.__name__
@@ -197,15 +185,14 @@ class EventGroupBase(EventGroupBaseMixedIn):
             }
         return super()._get_model_schema(bound_model)
 
-    def abort(
-        self,
-        error_code: int | str,
-        description: str,
-        *,
-        critical: bool = False,
-        **_,
-    ):
-        raise EventException(error_code, description, critical)
+    def doc_abort(self, error_code: int | str, description: str):
+        def doc_abort_wrapper(function):
+            return function
+
+        return doc_abort_wrapper
+
+    def abort(self, error_code: int | str, description: str):
+        raise EventException(error_code, description, False)
 
 
 class EventGroup(_EventGroup, EventGroupBase):  # DEPRECATED

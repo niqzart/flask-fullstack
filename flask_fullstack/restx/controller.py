@@ -65,8 +65,6 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
         self,
         error_code: int | str,
         description: str,
-        *,
-        critical: bool = False,
     ):
         response = ResponseDoc.error_response(error_code, description)
         return self.response(*response.get_args())

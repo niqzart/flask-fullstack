@@ -10,36 +10,16 @@ from ..utils import get_or_pop
 
 
 class AbstractAbortMixin:
-    def abort(
-        self,
-        error_code: int | str,
-        description: str,
-        *,
-        critical: bool = False,
-        **kwargs,
-    ):
+    def abort(self, error_code: int | str, description: str):
         raise NotImplementedError
 
-    def doc_abort(
-        self,
-        error_code: int | str,
-        description: str,
-        *,
-        critical: bool = False,
-    ):
+    def doc_abort(self, error_code: int | str, description: str):
         raise NotImplementedError
 
-    def doc_aborts(
-        self,
-        *responses: tuple[int | str, str] | tuple[int | str, str, bool],
-    ):
+    def doc_aborts(self, *responses: tuple[int | str, str]):
         def doc_aborts_wrapper(function):
             for response in responses:
-                function = self.doc_abort(
-                    response[0],
-                    response[1],
-                    critical=response[2] if len(response) == 3 else False,
-                )(function)
+                function = self.doc_abort(response[0], response[1])(function)
             return function
 
         return doc_aborts_wrapper
@@ -76,7 +56,7 @@ class DatabaseSearcherMixin(AbstractAbortMixin, metaclass=ABCMeta):
         # TODO redo doc_abort & abort to handle this automagically
 
         def searcher_wrapper(function):
-            @self.doc_abort(error_code, identifiable.not_found_text, critical=True)
+            @self.doc_abort(error_code, identifiable.not_found_text)
             @wraps(function)
             def searcher_inner(*args, **kwargs):
                 target_id: int = get_or_pop(kwargs, input_field_name, check_only)
@@ -94,9 +74,9 @@ class DatabaseSearcherMixin(AbstractAbortMixin, metaclass=ABCMeta):
 
 
 class JWTAuthorizerMixin(AbstractAbortMixin, metaclass=ABCMeta):
-    auth_errors: list[tuple[int | str, str, bool]] = [
-        ("401 ", "JWTError", True),
-        ("422 ", "InvalidJWT", True),
+    auth_errors: list[tuple[int | str, str]] = [
+        ("401 ", "JWTError"),
+        ("422 ", "InvalidJWT"),
     ]
 
     def _get_identity(self) -> dict | None:
@@ -140,7 +120,7 @@ class JWTAuthorizerMixin(AbstractAbortMixin, metaclass=ABCMeta):
         :param result_field_name: overrides default name of found object [default: role.__name__.lower()]
         """
         auth_errors = self.auth_errors.copy()
-        auth_errors.append(role.unauthorized_error + (True,))
+        auth_errors.append(role.unauthorized_error)
 
         if result_field_name is None:
             result_field_name = role.__name__.lower()
