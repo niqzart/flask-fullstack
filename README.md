@@ -22,7 +22,7 @@ TBD
 
 ## Features
 ### Interfaces & Mixins
-- Database Interfaces: Implement these to later automate searching & authorization (see below)
+- [Database Interfaces](./docs/database-interfaces.md): Implement these to later automate searching & authorization (see below)
 - Mixins with Decorators: Classes full of useful decorators to be used in less abstract context (see below)
 
 ### RESTX improvements
