@@ -1,4 +1,4 @@
-from distutils.core import setup
+from setuptools import setup, find_packages
 
 setup(
     name="Flask Fullstack",
@@ -7,7 +7,7 @@ setup(
     author="niqzart",
     author_email="qwert45hi@yandex.ru",
     url="https://github.com/niqzart/flask-fullstack",
-    packages=["flask_fullstack"],
+    packages=find_packages(),
     install_requires=[
         "Flask-Cors ~= 3.0.10",
         "Flask-JWT-Extended ~= 4.3.1",
