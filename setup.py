@@ -1,15 +1,22 @@
 from setuptools import setup, find_packages
 
+description = (
+    "A utility package for projects using flask, sqlalchemy, socketio and pytest"
+)
+with open("README.md", encoding="utf-8") as f:
+    long_description = f.read()
+
 setup(
     name="flask-fullstack",
     py_modules=["flask_fullstack"],
-    version="0.4.5",
-    description="TBA",
+    version="0.4.8",
+    description=description,
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     author="niqzart",
     author_email="qwert45hi@yandex.ru",
     url="https://github.com/niqzart/flask-fullstack",
-    packages=find_packages("flask_fullstack"),
-    package_dir={"": "flask_fullstack"},
+    packages=find_packages(),
     install_requires=[
         "Flask-Cors ~= 3.0.10",
         "Flask-JWT-Extended ~= 4.3.1",
