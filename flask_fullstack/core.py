@@ -180,10 +180,10 @@ def configure_sqlalchemy(
     )
 
 
-def configure_whooshee(sessionmaker: Sessionmaker, whoosh_base: str):
+def configure_whooshee(session, whoosh_base: str):
     whooshee_config = {
         "WHOOSHEE_MIN_STRING_LEN": 0,
         "WHOOSHEE_ENABLE_INDEXING": True,
         "WHOOSH_BASE": whoosh_base,
     }
-    return IndexService(config=whooshee_config, session=sessionmaker())
+    return IndexService(config=whooshee_config, session=session)
