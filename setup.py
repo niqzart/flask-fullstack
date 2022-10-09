@@ -1,13 +1,15 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="Flask Fullstack",
-    version="0.4.2",
+    name="flask-fullstack",
+    py_modules=["flask_fullstack"],
+    version="0.4.5",
     description="TBA",
     author="niqzart",
     author_email="qwert45hi@yandex.ru",
     url="https://github.com/niqzart/flask-fullstack",
-    packages=find_packages(),
+    packages=find_packages("flask_fullstack"),
+    package_dir={"": "flask_fullstack"},
     install_requires=[
         "Flask-Cors ~= 3.0.10",
         "Flask-JWT-Extended ~= 4.3.1",
