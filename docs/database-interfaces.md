@@ -1,5 +1,5 @@
 # Database Interfaces
-You can use these interfaces on your collection classes, whatever they are, tables in sqlaclhemy-orm or schemas in mongo-engine. They are intended for use with [mixins](./decorator-mixins).
+You can use these interfaces on your collection classes, whatever they are, tables in sqlaclhemy-orm or schemas in mongo-engine. They are intended for use with [mixins](./decorator-mixins.md).
 
 ## Identifiable
 Anything with an integer primary key can be an Identifiable. The only method (classmethod), `.find_by_id`, needs to find an object of type, implementing the Identifiable type, if noting is found, it should return `None`. Define `not_found_text` to specify the customizable text to use in error messages if the Identifiable is not found. This interface is used in `.database_searcher`.

@@ -23,7 +23,7 @@ TBD
 ## Features
 ### Interfaces & Mixins
 - [Database Interfaces](./docs/database-interfaces.md): Implement these to later automate searching & authorization (see below)
-- Mixins with Decorators: Classes full of useful decorators to be used in less abstract context (see below)
+- [Mixins with Decorators](./docs/decorator-mixins.md): Classes full of useful decorators to be used in less abstract context (see below)
 
 ### RESTX improvements
 - New Marshals: form SQLAlchemy to Pydantic and then to the Response Marshaling
