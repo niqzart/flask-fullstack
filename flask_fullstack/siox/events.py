@@ -84,6 +84,7 @@ class ClientEvent(Event):
         exclude_none: bool = None,
         force_wrap: bool = None,
         force_ack: bool = None,
+        additional_models: list[dict] = None,
         additional_docs: dict = None,
     ):
         super().__init__(model, namespace, name, description, additional_docs)
@@ -97,6 +98,7 @@ class ClientEvent(Event):
         self.ack_model: type[BaseModel] = ack_model
         self.force_wrap: bool = force_wrap is True
         self.forced_ack: bool = force_ack is True and ack_model is None
+        self.additional_models: list[dict] = additional_models or []
 
     def parse(self, data: dict):
         return self.model.parse_obj(data).dict()
@@ -182,10 +184,15 @@ class ClientEvent(Event):
 
     def create_doc(self, namespace: str = None, additional_docs: dict = None):
         result = super().create_doc(namespace, additional_docs)
+        models = [result["message"]] + [
+            {"name": f"{self.name}-error-{i}", "payload": model}
+            for i, model in enumerate(self.additional_models)
+        ]
 
         if self.ack_model or self.forced_ack:
-            result["message"] = {"oneOf": [result["message"], self.ack_model_doc()]}
+            models.insert(1, self.ack_model_doc())
 
+        result["message"] = {"oneOf": models}
         return {"publish": result}
 
 
@@ -287,36 +294,38 @@ class DuplexEvent(BaseEvent):
         ack_exclude_none: bool = True,
         ack_force_wrap: bool = None,
         ack_force: bool = None,
+        additional_models: list[dict] = None,
         additional_docs: dict = None,
     ):
         return cls(
             ClientEvent(
-                model,
-                ack_model,
-                namespace,
-                name,
-                description,
-                handler,
-                ack_include,
-                ack_exclude,
-                ack_exclude_none,
-                ack_force_wrap,
-                ack_force,
+                model=model,
+                ack_model=ack_model,
+                namespace=namespace,
+                name=name,
+                description=description,
+                handler=handler,
+                include=ack_include,
+                exclude=ack_exclude,
+                exclude_none=ack_exclude_none,
+                force_wrap=ack_force_wrap,
+                force_ack=ack_force,
+                additional_models=additional_models,
             ),
             ServerEvent(
-                model,
-                name,
-                namespace,
-                description,
-                include,
-                exclude,
-                exclude_none,
+                model=model,
+                name=name,
+                namespace=namespace,
+                description=description,
+                include=include,
+                exclude=exclude,
+                exclude_none=exclude_none,
             ),
-            use_event,
-            namespace,
-            name,
-            description,
-            additional_docs,
+            use_event=use_event,
+            namespace=namespace,
+            name=name,
+            description=description,
+            additional_docs=additional_docs,
         )
 
     def attach_name(self, name: str):
