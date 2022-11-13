@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from abc import ABCMeta
 from collections.abc import Callable
 from datetime import datetime
 from functools import wraps
@@ -17,25 +16,11 @@ from .events import (
     ServerEvent as _ServerEvent,
     DuplexEvent as _DuplexEvent,
 )
-from .groups import EventGroup as _EventGroup
 from .structures import EventException
-from .structures import (
-    EventGroupBase as _EventGroupBase,
-    Namespace as _Namespace,
-    SocketIO as _SocketIO,
-)
+from .structures import Namespace as _Namespace, SocketIO as _SocketIO
 from ..base import DatabaseSearcherMixin, JWTAuthorizerMixin
 from ..restx import PydanticModel
 from ..utils import Nameable, TypeEnum, restx_model_to_message
-
-
-class EventGroupBaseMixedIn(
-    _EventGroupBase,
-    DatabaseSearcherMixin,
-    JWTAuthorizerMixin,
-    metaclass=ABCMeta,
-):
-    pass
 
 
 class ClientEvent(_ClientEvent):
@@ -160,7 +145,7 @@ class DuplexEvent(_DuplexEvent):
         )
 
 
-class EventGroupBase(EventGroupBaseMixedIn):
+class EventController(_EventController, DatabaseSearcherMixin, JWTAuthorizerMixin):
     ClientEvent = ClientEvent
     ServerEvent = ServerEvent
     DuplexEvent = DuplexEvent
@@ -191,12 +176,6 @@ class EventGroupBase(EventGroupBaseMixedIn):
     def abort(self, error_code: int | str, description: str):
         raise EventException(error_code, description, False)
 
-
-class EventGroup(_EventGroup, EventGroupBase):  # DEPRECATED
-    pass
-
-
-class EventController(_EventController, EventGroupBase):
     def _marshal_ack_wrapper(
         self,
         ack_model: type[BaseModel],
@@ -238,7 +217,10 @@ class Namespace(_Namespace):
             @jwt_required(optional=True)
             def user_connect(*_):
                 identity = get_jwt_identity()
-                if identity is None or (user_id := identity.get(protected, None)) is None:
+                if (
+                    identity is None
+                    or (user_id := identity.get(protected, None)) is None
+                ):
                     raise ConnectionRefusedError("unauthorized!")
                 join_room(f"user-{user_id}")
 
@@ -272,7 +254,7 @@ class SocketIO(_SocketIO):
     def add_namespace(
         self,
         name: str = None,
-        *event_groups: EventGroupBase,
+        *event_groups: EventController,
         protected: str | bool = False,
     ):
         namespace = self.namespace_class(name, self.use_kebab_case)
