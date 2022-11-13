@@ -15,11 +15,9 @@ class BaseEvent:  # do not instantiate!
         self,
         name: str = None,
         namespace: str = None,
-        additional_docs: dict = None,
     ):
         self.name = None
         self.namespace = namespace
-        self.additional_docs: dict | None = additional_docs
         if name is not None:
             self.attach_name(name)
 
@@ -29,7 +27,7 @@ class BaseEvent:  # do not instantiate!
     def attach_namespace(self, namespace: str):
         raise NotImplementedError
 
-    def create_doc(self, namespace: str, additional_docs: dict = None):
+    def create_doc(self, namespace: str):
         raise NotImplementedError
 
 
@@ -40,9 +38,8 @@ class Event(BaseEvent):  # do not instantiate!
         namespace: str = None,
         name: str = None,
         description: str = None,
-        additional_docs: dict = None,
     ):
-        super().__init__(name, namespace, additional_docs)
+        super().__init__(name, namespace)
         self.model: type[BaseModel] = model
         self.description: str = description
 
@@ -52,7 +49,7 @@ class Event(BaseEvent):  # do not instantiate!
     def attach_namespace(self, namespace: str):
         self.namespace = namespace
 
-    def create_doc(self, namespace: str = None, additional_docs: dict = None):
+    def create_doc(self, namespace: str = None):
         model_name: str = getattr(self.model, "name", None) or self.model.__name__
         if namespace is None:
             namespace = self.namespace
@@ -63,9 +60,7 @@ class Event(BaseEvent):  # do not instantiate!
                 if namespace is not None
                 else None,
                 "message": {"$ref": f"#/components/messages/{model_name}"},
-            },
-            **(self.additional_docs or {}),
-            **(additional_docs or {}),
+            }
         )
 
 
@@ -85,9 +80,8 @@ class ClientEvent(Event):
         force_wrap: bool = None,
         force_ack: bool = None,
         additional_models: list[dict] = None,
-        additional_docs: dict = None,
     ):
-        super().__init__(model, namespace, name, description, additional_docs)
+        super().__init__(model, namespace, name, description)
         self._ack_kwargs = {
             "exclude_none": exclude_none is not False,
             "include": include,
@@ -182,8 +176,8 @@ class ClientEvent(Event):
             },
         }
 
-    def create_doc(self, namespace: str = None, additional_docs: dict = None):
-        result = super().create_doc(namespace, additional_docs)
+    def create_doc(self, namespace: str = None):
+        result = super().create_doc(namespace)
         models = [result["message"]] + [
             {"name": f"{self.name}-error-{i}", "payload": model}
             for i, model in enumerate(self.additional_models)
@@ -207,9 +201,8 @@ class ServerEvent(Event):
         include: set[str] = None,
         exclude: set[str] = None,
         exclude_none: bool = None,
-        additional_docs: dict = None,
     ):
-        super().__init__(model, namespace, name, description, additional_docs)
+        super().__init__(model, namespace, name, description)
         self._emit_kwargs = {
             "exclude_none": exclude_none is not False,
             "include": include,
@@ -254,8 +247,8 @@ class ServerEvent(Event):
             _broadcast,
         )
 
-    def create_doc(self, namespace: str = None, additional_docs: dict = None):
-        return {"subscribe": super().create_doc(namespace, additional_docs)}
+    def create_doc(self, namespace: str = None):
+        return {"subscribe": super().create_doc(namespace)}
 
 
 @dataclass()
@@ -268,9 +261,8 @@ class DuplexEvent(BaseEvent):
         namespace: str = None,
         name: str = None,
         description: str = None,
-        additional_docs: dict = None,
     ):
-        super().__init__(name, namespace, additional_docs)
+        super().__init__(name, namespace)
         self.client_event: ClientEvent = client_event
         self.server_event: ServerEvent = server_event
         self.description: str = description
@@ -295,7 +287,6 @@ class DuplexEvent(BaseEvent):
         ack_force_wrap: bool = None,
         ack_force: bool = None,
         additional_models: list[dict] = None,
-        additional_docs: dict = None,
     ):
         return cls(
             ClientEvent(
@@ -325,7 +316,6 @@ class DuplexEvent(BaseEvent):
             namespace=namespace,
             name=name,
             description=description,
-            additional_docs=additional_docs,
         )
 
     def attach_name(self, name: str):
@@ -368,12 +358,9 @@ class DuplexEvent(BaseEvent):
     def __call__(self, data=None):
         return self.client_event(data)
 
-    def create_doc(self, namespace: str = None, additional_docs: dict = None):
-        if additional_docs is None:
-            additional_docs = {}
-        additional_docs.update(self.additional_docs or {})
-        result: dict = self.client_event.create_doc(namespace, additional_docs)
-        result.update(self.server_event.create_doc(namespace, additional_docs))
+    def create_doc(self, namespace: str = None):
+        result: dict = self.client_event.create_doc(namespace)
+        result.update(self.server_event.create_doc(namespace))
         if self.description is not None:
             result["description"] = self.description
         return result
