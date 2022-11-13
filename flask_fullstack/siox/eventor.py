@@ -38,7 +38,6 @@ class ClientEvent(_ClientEvent):
         force_wrap: bool = None,
         force_ack: bool = None,
         additional_models: list[dict] = None,
-        additional_docs: dict = None,
     ):
         super().__init__(
             model,
@@ -53,7 +52,6 @@ class ClientEvent(_ClientEvent):
             force_wrap is not False,
             force_ack is not False,
             additional_models,
-            additional_docs,
         )
 
     def _force_wrap(self, data) -> dict:
