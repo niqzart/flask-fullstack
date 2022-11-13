@@ -5,10 +5,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from logging import Filter, getLogger
 
+from flask_restx import Model
 from flask_socketio import Namespace as _Namespace, SocketIO as _SocketIO, disconnect
 
 from .interfaces import EventGroupBase
-from ..utils import render_packed
+from ..utils import render_packed, restx_model_to_message
 
 
 @dataclass
@@ -86,8 +87,10 @@ class SocketIO(_SocketIO):
         remove_ping_pong_logs: bool = False,
         use_kebab_case: bool = False,
         namespace_class: type[Namespace] = None,
+        restx_models: dict[str, Model] = None,  # TODO get rid of restx
         **kwargs,
     ):
+        self.doc_path = doc_path
         self.use_kebab_case = use_kebab_case
         self.namespace_class = (
             self.default_namespace_class if namespace_class is None else namespace_class
@@ -97,11 +100,17 @@ class SocketIO(_SocketIO):
             "asyncapi": "2.2.0",
             "info": {"title": title, "version": version},
             "channels": OrderedDict(),
-            "components": {"messages": OrderedDict()},
+            "components": {
+                "messages": OrderedDict(
+                    (name, restx_model_to_message(name, model))
+                    for name, model in (restx_models or {}).items()
+                )
+            },
         }
-        self.doc_path = doc_path
+
         if remove_ping_pong_logs:
             getLogger("engineio.server").addFilter(NoPingPongFilter())
+
         super().__init__(app, **kwargs)
 
     def docs(self):
