@@ -7,7 +7,6 @@ from functools import wraps
 from json import dumps, loads
 
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from flask_restx import Model
 from flask_socketio import join_room
 from pydantic import BaseModel
 from socketio.exceptions import ConnectionRefusedError
@@ -27,7 +26,7 @@ from .structures import (
 )
 from ..base import DatabaseSearcherMixin, JWTAuthorizerMixin
 from ..restx import PydanticModel
-from ..utils import Nameable, TypeEnum
+from ..utils import Nameable, TypeEnum, restx_model_to_message
 
 
 class EventGroupBaseMixedIn(
@@ -178,11 +177,9 @@ class EventGroupBase(EventGroupBaseMixedIn):
 
     def _get_model_schema(self, bound_model: type[BaseModel]):
         if isinstance(bound_model, type) and issubclass(bound_model, PydanticModel):
-            return {
-                "payload": Model(
-                    self._get_model_name(bound_model), bound_model.model()
-                ).__schema__
-            }
+            return restx_model_to_message(
+                self._get_model_name(bound_model), bound_model.model()
+            )
         return super()._get_model_schema(bound_model)
 
     def doc_abort(self, error_code: int | str, description: str):
