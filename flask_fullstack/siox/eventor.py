@@ -37,6 +37,7 @@ class ClientEvent(_ClientEvent):
         exclude_none: bool = None,
         force_wrap: bool = None,
         force_ack: bool = None,
+        additional_models: list[dict] = None,
         additional_docs: dict = None,
     ):
         super().__init__(
@@ -51,6 +52,7 @@ class ClientEvent(_ClientEvent):
             exclude_none,
             force_wrap is not False,
             force_ack is not False,
+            additional_models,
             additional_docs,
         )
 
@@ -168,7 +170,26 @@ class EventController(_EventController, DatabaseSearcherMixin, JWTAuthorizerMixi
         return super()._get_model_schema(bound_model)
 
     def doc_abort(self, error_code: int | str, description: str):
-        def doc_abort_wrapper(function):
+        def doc_abort_wrapper(function: _ClientEvent | _DuplexEvent | Callable):
+            payload = {
+                "type": "object",
+                "required": ["code", "message"],
+                "properties": {
+                    "code": {"const": int(error_code)},
+                    "message": {"const": description},
+                },
+            }
+
+            if isinstance(function, _ClientEvent):
+                function.additional_models.append(payload)
+            elif isinstance(function, _DuplexEvent):
+                function.client_event.additional_models.append(payload)
+            elif not hasattr(function, "__event_data__"):
+                function.__event_data__ = {"additional_models": [payload]}
+            elif "additional_models" in function.__event_data__:
+                function.__event_data__["additional_models"].append(payload)
+            else:
+                function.__event_data__["additional_models"] = [payload]
             return function
 
         return doc_abort_wrapper
