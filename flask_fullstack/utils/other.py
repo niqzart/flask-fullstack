@@ -26,6 +26,17 @@ class TypeEnum(Enum):
     def to_string(self) -> str:
         return self.name.lower().replace("_", "-")
 
+    @classmethod
+    def validate(cls, string: str):
+        result = cls.from_string(string)
+        if result is None:
+            raise ValueError(f"{string} is not a valid {cls.__name__}")
+        return result
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
 
 def render_packed(
     data: dict | str | int | None = None,
