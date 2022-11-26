@@ -193,7 +193,7 @@ class EventController(_EventController, DatabaseSearcherMixin, JWTAuthorizerMixi
         return doc_abort_wrapper
 
     def abort(self, error_code: int | str, description: str):
-        raise EventException(error_code, description, False)
+        raise EventException(error_code, description)
 
     def _marshal_ack_wrapper(
         self,

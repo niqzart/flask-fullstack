@@ -5,8 +5,9 @@ from dataclasses import dataclass
 from functools import wraps
 
 from flask_socketio import emit
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
+from .errors import EventException
 from ..utils import remove_none, unpack_params, render_model, render_packed
 
 
@@ -129,7 +130,11 @@ class ClientEvent(Event):
         self.handler = self._handler(function)
 
     def __call__(self, data=None):
-        return self.handler(**self.parse(data))
+        try:
+            kwargs = self.parse(data)
+        except ValidationError as e:
+            raise EventException(code=400, message="Validation failed", data=e.errors())
+        return self.handler(**kwargs)
 
     def attach_ack(
         self,

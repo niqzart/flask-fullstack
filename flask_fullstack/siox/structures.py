@@ -2,21 +2,14 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Callable
-from dataclasses import dataclass
 from logging import Filter, getLogger
 
 from flask_restx import Model
 from flask_socketio import Namespace as _Namespace, SocketIO as _SocketIO, disconnect
 
+from .errors import EventException
 from .interfaces import EventGroupBase
 from ..utils import render_packed, restx_model_to_message
-
-
-@dataclass
-class EventException(Exception):
-    code: int
-    message: str
-    critical: bool = False
 
 
 class Namespace(_Namespace):
@@ -55,8 +48,13 @@ class Namespace(_Namespace):
         for name, handler in event_group.extract_handlers():
             self.on_event(name)(handler)
 
-    def handle_exception(self, exception: EventException) -> dict | None:
-        return render_packed(code=exception.code, message=exception.message)
+    def handle_exception(
+        self,
+        data: dict | list | str | int | None = None,
+        code: int | None = None,
+        message: str | None = None,
+    ) -> dict | None:
+        return render_packed(data=data, code=code, message=message)
 
     def trigger_event(self, event, *args):
         try:
@@ -64,7 +62,7 @@ class Namespace(_Namespace):
         except EventException as e:
             if e.critical:
                 disconnect()
-            return self.handle_exception(e)
+            return self.handle_exception(code=e.code, message=e.message, data=e.data)
 
 
 class NoPingPongFilter(Filter):
