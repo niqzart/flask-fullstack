@@ -10,7 +10,7 @@ class Identifiable:
     """
     An interface to mark database classes that have an id and can be identified by it.
 
-    Used in :ref:`.Namespace.database_searcher`
+    Used in :ref:`.DatabaseSearcherMixin.database_searcher`
     """
 
     not_found_text: str = ""
@@ -27,10 +27,10 @@ class UserRole:
     """
     An interface to mark database classes as user roles, that can be used for authorization.
 
-    Used in :ref:`.Namespace.jwt_authorizer`
+    Used in :ref:`.JWTAuthorizerMixin.jwt_authorizer`
     """
 
-    unauthorized_error: tuple[int | str, str] = (403, "Permission denied")
+    unauthorized_error: tuple[int | str, str] = 403, "Permission denied"
 
     def __init__(self, **kwargs):
         pass

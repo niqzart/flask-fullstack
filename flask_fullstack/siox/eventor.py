@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from abc import ABCMeta
 from collections.abc import Callable
 from datetime import datetime
 from functools import wraps
 from json import dumps, loads
 
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from flask_restx import Model
 from flask_socketio import join_room
 from pydantic import BaseModel
 from socketio.exceptions import ConnectionRefusedError
@@ -18,25 +16,11 @@ from .events import (
     ServerEvent as _ServerEvent,
     DuplexEvent as _DuplexEvent,
 )
-from .groups import EventGroup as _EventGroup
 from .structures import EventException
-from .structures import (
-    EventGroupBase as _EventGroupBase,
-    Namespace as _Namespace,
-    SocketIO as _SocketIO,
-)
+from .structures import Namespace as _Namespace, SocketIO as _SocketIO
 from ..base import DatabaseSearcherMixin, JWTAuthorizerMixin
 from ..restx import PydanticModel
-from ..utils import Nameable, TypeEnum
-
-
-class EventGroupBaseMixedIn(
-    _EventGroupBase,
-    DatabaseSearcherMixin,
-    JWTAuthorizerMixin,
-    metaclass=ABCMeta,
-):
-    pass
+from ..utils import Nameable, TypeEnum, restx_model_to_message
 
 
 class ClientEvent(_ClientEvent):
@@ -53,7 +37,7 @@ class ClientEvent(_ClientEvent):
         exclude_none: bool = None,
         force_wrap: bool = None,
         force_ack: bool = None,
-        additional_docs: dict = None,
+        additional_models: list[dict] = None,
     ):
         super().__init__(
             model,
@@ -67,7 +51,7 @@ class ClientEvent(_ClientEvent):
             exclude_none,
             force_wrap is not False,
             force_ack is not False,
-            additional_docs,
+            additional_models,
         )
 
     def _force_wrap(self, data) -> dict:
@@ -161,7 +145,7 @@ class DuplexEvent(_DuplexEvent):
         )
 
 
-class EventGroupBase(EventGroupBaseMixedIn):
+class EventController(_EventController, DatabaseSearcherMixin, JWTAuthorizerMixin):
     ClientEvent = ClientEvent
     ServerEvent = ServerEvent
     DuplexEvent = DuplexEvent
@@ -171,18 +155,6 @@ class EventGroupBase(EventGroupBaseMixedIn):
             bound_model.Config.title = bound_model.name
         super()._bind_model(bound_model)
 
-    def doc_abort(
-        self,
-        error_code: int | str,
-        description: str,
-        *,
-        critical: bool = False,
-    ):
-        def doc_abort_wrapper(function):
-            return function
-
-        return doc_abort_wrapper
-
     def _get_model_name(self, bound_model: type[BaseModel]):
         if isinstance(bound_model, type) and issubclass(bound_model, Nameable):
             return bound_model.name or bound_model.__name__
@@ -190,29 +162,39 @@ class EventGroupBase(EventGroupBaseMixedIn):
 
     def _get_model_schema(self, bound_model: type[BaseModel]):
         if isinstance(bound_model, type) and issubclass(bound_model, PydanticModel):
-            return {
-                "payload": Model(
-                    self._get_model_name(bound_model), bound_model.model()
-                ).__schema__
-            }
+            return restx_model_to_message(
+                self._get_model_name(bound_model), bound_model.model()
+            )
         return super()._get_model_schema(bound_model)
 
-    def abort(
-        self,
-        error_code: int | str,
-        description: str,
-        *,
-        critical: bool = False,
-        **_,
-    ):
-        raise EventException(error_code, description, critical)
+    def doc_abort(self, error_code: int | str, description: str):
+        def doc_abort_wrapper(function: _ClientEvent | _DuplexEvent | Callable):
+            payload = {
+                "type": "object",
+                "required": ["code", "message"],
+                "properties": {
+                    "code": {"const": int(error_code)},
+                    "message": {"const": description},
+                },
+            }
 
+            if isinstance(function, _ClientEvent):
+                function.additional_models.append(payload)
+            elif isinstance(function, _DuplexEvent):
+                function.client_event.additional_models.append(payload)
+            elif not hasattr(function, "__event_data__"):
+                function.__event_data__ = {"additional_models": [payload]}
+            elif "additional_models" in function.__event_data__:
+                function.__event_data__["additional_models"].append(payload)
+            else:
+                function.__event_data__["additional_models"] = [payload]
+            return function
 
-class EventGroup(_EventGroup, EventGroupBase):  # DEPRECATED
-    pass
+        return doc_abort_wrapper
 
+    def abort(self, error_code: int | str, description: str):
+        raise EventException(error_code, description, False)
 
-class EventController(_EventController, EventGroupBase):
     def _marshal_ack_wrapper(
         self,
         ack_model: type[BaseModel],
@@ -254,7 +236,10 @@ class Namespace(_Namespace):
             @jwt_required(optional=True)
             def user_connect(*_):
                 identity = get_jwt_identity()
-                if identity is None or (user_id := identity.get(protected, None)) is None:
+                if (
+                    identity is None
+                    or (user_id := identity.get(protected, None)) is None
+                ):
                     raise ConnectionRefusedError("unauthorized!")
                 join_room(f"user-{user_id}")
 
@@ -288,7 +273,7 @@ class SocketIO(_SocketIO):
     def add_namespace(
         self,
         name: str = None,
-        *event_groups: EventGroupBase,
+        *event_groups: EventController,
         protected: str | bool = False,
     ):
         namespace = self.namespace_class(name, self.use_kebab_case)

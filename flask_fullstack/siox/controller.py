@@ -11,9 +11,10 @@ from ..utils import kebabify_model
 
 
 class EventController(EventGroupBase):
-    model_kwarg_names = ("include", "exclude", "exclude_none")
-    ack_kwarg_names = {n: "ack_" + n for n in model_kwarg_names + ("force_wrap",)}
-    ack_kwarg_names["force_ack"] = "force_ack"
+    server_kwarg_names = ("include", "exclude", "exclude_none")
+    client_kwarg_names = {n: "ack_" + n for n in server_kwarg_names + ("force_wrap",)}
+    client_kwarg_names["force_ack"] = "force_ack"
+    client_kwarg_names["additional_models"] = "additional_models"
 
     @staticmethod
     def _update_event_data(function: Callable, data: dict) -> Callable:
@@ -30,44 +31,26 @@ class EventController(EventGroupBase):
             kebabify_model(model)
         self._bind_model(model)
 
-    def add_docs(self, additional_docs: dict):
-        # TODO clearly label: Callable -> Callable & ClientEvent -> ClientEvent & DuplexEvent -> DuplexEvent
-        def add_docs_wrapper(
-            function: Callable | ClientEvent | DuplexEvent,
-        ) -> Callable | ClientEvent | DuplexEvent:
-            if isinstance(function, BaseEvent):
-                if function.additional_docs is None:
-                    function.additional_docs = additional_docs
-                else:
-                    function.additional_docs.update(additional_docs)
-            else:
-                self._update_event_data(function, {"additional_docs": additional_docs})
-
-            return function
-
-        return add_docs_wrapper
-
     def argument_parser(self, client_model: type[BaseModel] = BaseModel):
         self._maybe_bind_model(client_model)
 
         def argument_parser_wrapper(function: Callable) -> ClientEvent | DuplexEvent:
             event_data: dict = getattr(function, "__event_data__", {})
-            additional_docs: dict = getattr(function, "additional_docs", {})
 
-            ack_kwargs = {
+            client_kwargs = {
                 n: event_data.get(v, None)
-                for n, v in self.ack_kwarg_names.items()
+                for n, v in self.client_kwarg_names.items()
             }
             client_event = self.ClientEvent(
                 client_model,
                 event_data.get("ack_model", None),
-                **ack_kwargs,
+                **client_kwargs,
             )
 
             if event_data.get("duplex", False):
                 server_kwargs = {
                     n: event_data.get(n, None)
-                    for n in self.model_kwarg_names
+                    for n in self.server_kwarg_names
                 }
                 server_event = self.ServerEvent(
                     event_data.get("server_model", None) or client_model,
@@ -77,13 +60,11 @@ class EventController(EventGroupBase):
                     client_event,
                     server_event,
                     event_data.get("use_event", None),
-                    additional_docs=additional_docs,
                 )
                 duplex_event.bind(function)
                 return duplex_event
 
             client_event.bind(function)
-            client_event.additional_docs = additional_docs
             return client_event
 
         return argument_parser_wrapper
