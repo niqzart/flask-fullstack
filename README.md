@@ -27,7 +27,7 @@ TBD
 
 ### RESTX improvements
 - New Marshals: form SQLAlchemy to Pydantic and then to the Response Marshaling
-- Prebuilt Parsers: just a couple of commonly used parsers to `.copy()`
+- [Upgraded Parsers](./docs/upgraded-parsers.md): just a couple of commonly used parsers to `.copy()`
 - Resource Controller: RESTX's Namespace, but with access to useful decorators from mixins
 
 #### New Models
