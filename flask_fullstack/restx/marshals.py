@@ -397,11 +397,18 @@ class Model(Nameable):
                 def deconvert_one(cls: type[t], data: dict[str, ...]) -> t:
                     cls.convert_columns()
                     result: cls = super().deconvert_one(data)
-                    for name, column in named_columns.items():
+                    for name, column in named_columns.items():  # TODO raise parsing errors
+                        value = data.get(name, column.default)
+                        if (
+                            isinstance(column.type, Enum)
+                            and isinstance(column.type.enum_class, type)
+                            and issubclass(column.type.enum_class, TypeEnum)
+                        ):
+                            value = column.type.enum_class.from_string(value)
                         object.__setattr__(
                             result,
                             column.name,
-                            data.get(name, column.default),
+                            value,
                         )
                     return result
 

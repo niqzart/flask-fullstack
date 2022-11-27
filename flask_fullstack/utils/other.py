@@ -10,6 +10,21 @@ def NotImplementedField(_):
     raise NotImplementedError
 
 
+class TypeEnumInput:
+    def __init__(self, enum: type[TypeEnum]):
+        self.enum = enum
+
+    def __call__(self, value: str):
+        return self.enum.validate(value)
+
+    @property
+    def __schema__(self) -> dict:
+        return {
+            "type": "string",
+            "enum": self.enum.get_all_field_names(),
+        }
+
+
 class TypeEnum(Enum):
     @classmethod
     def from_string(cls, string: str) -> TypeEnum | None:  # TODO NonePointer!!!
@@ -26,9 +41,24 @@ class TypeEnum(Enum):
     def to_string(self) -> str:
         return self.name.lower().replace("_", "-")
 
+    @classmethod
+    def validate(cls, string: str):
+        result = cls.from_string(string)
+        if result is None:
+            raise ValueError(f"{string} is not a valid {cls.__name__}")
+        return result
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def as_input(cls):
+        return TypeEnumInput(cls)
+
 
 def render_packed(
-    data: dict | str | int | None = None,
+    data: dict | list | str | int | None = None,
     code: int | None = None,
     message: str | None = None,
 ) -> dict:
