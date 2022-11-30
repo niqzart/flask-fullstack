@@ -9,7 +9,7 @@ with open("README.md", encoding="utf-8") as f:
 setup(
     name="flask-fullstack",
     py_modules=["flask_fullstack"],
-    version="0.4.10",
+    version="0.4.11",
     description=description,
     long_description=long_description,
     long_description_content_type="text/markdown",

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from collections.abc import Callable
 from logging import Filter, getLogger
+from typing import Protocol
 
 from flask_restx import Model
 from flask_socketio import Namespace as _Namespace, SocketIO as _SocketIO, disconnect
@@ -10,6 +11,16 @@ from flask_socketio import Namespace as _Namespace, SocketIO as _SocketIO, disco
 from .errors import EventException
 from .interfaces import EventGroupBase
 from ..utils import render_packed, restx_model_to_message
+
+
+class BeforeEventProtocol(Protocol):
+    def __call__(self, *args):
+        pass
+
+
+class AfterEventProtocol(Protocol):
+    def __call__(self, result):
+        pass
 
 
 class Namespace(_Namespace):
@@ -106,6 +117,9 @@ class SocketIO(_SocketIO):
             },
         }
 
+        self.before_event_funcs: list[BeforeEventProtocol] = []
+        self.after_event_funcs: list[AfterEventProtocol] = []
+
         if remove_ping_pong_logs:
             getLogger("engineio.server").addFilter(NoPingPongFilter())
 
@@ -131,6 +145,17 @@ class SocketIO(_SocketIO):
             )
         return super().on_namespace(namespace_handler)
 
+    def _handle_event(self, handler, message, namespace, sid, *args):
+        def new_handler(*args):
+            for function in self.before_event_funcs:
+                args = function(*args)
+            result = handler(*args)
+            for function in self.after_event_funcs:
+                result = function(result)
+            return result
+
+        return super()._handle_event(new_handler, message, namespace, sid, *args)
+
     def _add_namespace(self, namespace: Namespace, *event_groups: EventGroupBase):
         for event_group in event_groups:
             namespace.attach_event_group(event_group)
@@ -141,3 +166,9 @@ class SocketIO(_SocketIO):
             self.namespace_class(name, self.use_kebab_case),
             *event_groups,
         )
+
+    def before_event(self, function: BeforeEventProtocol):
+        self.before_event_funcs.append(function)
+
+    def after_event(self, function: AfterEventProtocol):
+        self.after_event_funcs.append(function)
