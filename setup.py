@@ -9,7 +9,7 @@ with open("README.md", encoding="utf-8") as f:
 setup(
     name="flask-fullstack",
     py_modules=["flask_fullstack"],
-    version="0.4.10",
+    version="0.4.12",
     description=description,
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -20,11 +20,11 @@ setup(
     install_requires=[
         "Flask-Cors ~= 3.0.10",
         "Flask-JWT-Extended ~= 4.3.1",
-        "Flask-RESTX ~= 0.5.1",
+        "Flask-RESTX ~= 1.0.3",
+        "Flask-SQLAlchemy ~= 3.0.2",
         "Flask-SocketIO ~= 5.1.0",
         "pydantic ~= 1.9.0",
         "SQLAlchemy ~= 1.4.31",
-        "Werkzeug == 2.0.2",  # for restx
         "Whoosh ~= 2.7.4",
         "WhooshAlchemy ~= 0.3.1",
     ],

@@ -17,11 +17,10 @@ from flask_jwt_extended import (
     unset_jwt_cookies,
 )
 from flask_restx import Api
-from sqlalchemy import create_engine, MetaData
 from werkzeug.exceptions import NotFound
 
 from .restx.marshals import flask_restx_has_bad_design
-from .utils import Sessionmaker, create_base, ModBase, Session, IndexService
+from .utils import IndexService
 
 SECRETS = (
     "SECRET_KEY",
@@ -166,18 +165,6 @@ class Flask(_Flask):
 
 def configure_logging(config: dict):
     dictConfig(config)
-
-
-def configure_sqlalchemy(
-    db_url: str,
-    **engine_kwargs,
-) -> tuple[MetaData, type[ModBase], Sessionmaker]:
-    engine = create_engine(db_url, pool_recycle=280, **engine_kwargs)
-    return (
-        (db_meta := MetaData(bind=engine)),
-        create_base(db_meta),
-        Sessionmaker(bind=engine, class_=Session),
-    )
 
 
 def configure_whooshee(session, whoosh_base: str):

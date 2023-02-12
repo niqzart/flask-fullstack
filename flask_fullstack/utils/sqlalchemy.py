@@ -1,81 +1,32 @@
 from __future__ import annotations
 
-from functools import wraps
 from typing import TypeVar
 
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy as _SQLAlchemy
+from flask_sqlalchemy.model import Model
 from sqlalchemy import MetaData, select
 from sqlalchemy.engine import Row
-from sqlalchemy.orm import (
-    sessionmaker,
-    declarative_base,
-    Session as _Session,
-    DeclarativeMeta,
-)
+from sqlalchemy.orm import declarative_base, DeclarativeMeta
 from sqlalchemy.sql import Select
 
 from .named import NamedPropertiesMeta
 
-
-# TODO proper type annotations for Select (mb python3.11's Self type)
-# noinspection PyUnresolvedReferences
-class Session(_Session):
-    def get_first(self, stmt: Select) -> object | None:
-        return self.execute(stmt).scalars().first()
-
-    def get_first_row(self, stmt: Select) -> Row:
-        return self.execute(stmt).first()
-
-    def get_all(self, stmt: Select) -> list[object]:
-        return self.execute(stmt).scalars().all()
-
-    def get_all_rows(self, stmt: Select) -> list[Row]:
-        return self.execute(stmt).all()
-
-    def get_paginated(self, stmt: Select, offset: int, limit: int) -> list[object]:
-        return self.get_all(stmt.offset(offset).limit(limit))
-
-    def get_paginated_rows(self, stmt: Select, offset: int, limit: int) -> list[Row]:
-        return self.get_all_rows(stmt.offset(offset).limit(limit))
-
-
-class Sessionmaker(sessionmaker):
-    def with_begin(self, function):
-        """Wraps the function with Session.begin() and passes session object to the decorated function"""
-
-        @wraps(function)
-        def with_begin_inner(*args, **kwargs):
-            if "session" in kwargs:
-                return function(*args, **kwargs)
-            with self.begin() as session:
-                kwargs["session"] = session
-                return function(*args, **kwargs)
-
-        return with_begin_inner
-
-    def with_autocommit(self, function):
-        """Wraps the function with Session.begin() for automatic commits after the decorated function"""
-
-        @wraps(function)
-        def with_autocommit_inner(*args, **kwargs):
-            with self.begin() as _:
-                return function(*args, **kwargs)
-
-        return with_autocommit_inner
-
-
-t = TypeVar("t", bound="ModBase")
+v = TypeVar("v")
+t = TypeVar("t", bound="Model")
+m = TypeVar("m", bound="SQLAlchemy.Model")
 
 
 class ModBaseMeta(NamedPropertiesMeta, DeclarativeMeta):
     pass
 
 
-class ModBase:  # TODO remove session usages?
+class CustomModel(Model):
     @classmethod
-    def create(cls: type[t], session: Session, **kwargs) -> t:
+    def create(cls: type[t], **kwargs) -> t:
         entry = cls(**kwargs)
-        session.add(entry)
-        session.flush()
+        cls.__fsa__.session.add(entry)
+        cls.__fsa__.session.flush()
         return entry
 
     @classmethod
@@ -85,44 +36,83 @@ class ModBase:  # TODO remove session usages?
         return select(cls).filter_by(**kwargs).order_by(*order_by)
 
     @classmethod
-    def find_first_by_kwargs(cls: type[t], session, *order_by, **kwargs) -> t | None:
-        return session.get_first(cls.select_by_kwargs(*order_by, **kwargs))
+    def find_first_by_kwargs(cls: type[t], *order_by, **kwargs) -> t | None:
+        return cls.__fsa__.get_first(cls.select_by_kwargs(*order_by, **kwargs))
 
     @classmethod
-    def find_first_row_by_kwargs(cls, session, *order_by, **kwargs) -> Row | None:
-        return session.get_first_row(cls.select_by_kwargs(*order_by, **kwargs))
-
-    @classmethod
-    def find_all_by_kwargs(cls: type[t], session, *order_by, **kwargs) -> list[t]:
-        return session.get_all(cls.select_by_kwargs(*order_by, **kwargs))
-
-    @classmethod
-    def find_all_rows_by_kwargs(cls, session, *order_by, **kwargs) -> list[Row]:
-        return session.get_all_rows(cls.select_by_kwargs(*order_by, **kwargs))
+    def find_all_by_kwargs(cls: type[t], *order_by, **kwargs) -> list[t]:
+        return cls.__fsa__.get_all(cls.select_by_kwargs(*order_by, **kwargs))
 
     @classmethod
     def find_paginated_by_kwargs(
-        cls: type[t], session, offset: int, limit: int, *order_by, **kwargs
+        cls: type[t], offset: int, limit: int, *order_by, **kwargs
     ) -> list[t]:
-        return session.get_paginated(
+        return cls.__fsa__.get_paginated(
             cls.select_by_kwargs(*order_by, **kwargs), offset, limit
         )
 
-    @classmethod
-    def find_paginated_rows_by_kwargs(
-        cls, session, offset: int, limit: int, *order_by, **kwargs
-    ) -> list[Row]:
-        return session.get_paginated_rows(
-            cls.select_by_kwargs(*order_by, **kwargs), offset, limit
+    def delete(self) -> None:
+        self.__fsa__.session.delete(self)
+        self.__fsa__.session.flush()
+
+
+# TODO proper type annotations for Select (mb python3.11's Self type)
+# noinspection PyUnresolvedReferences
+class SQLAlchemy(_SQLAlchemy):
+    DEFAULT_ENGINE_OPTIONS = {"pool_recycle": 280}
+    DEFAULT_CONVENTION = {
+        "ix": "ix_%(column_0_label)s",  # noqa: WPS323
+        "uq": "uq_%(table_name)s_%(column_0_name)s",  # noqa: WPS323
+        "ck": "ck_%(table_name)s_%(constraint_name)s",  # noqa: WPS323
+        "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",  # noqa: WPS323
+        "pk": "pk_%(table_name)s",  # noqa: WPS323
+    }
+
+    def __init__(
+        self,
+        app: Flask,
+        db_url: str,
+        naming_convention: dict | None = None,
+        echo: bool = False,
+        **kwargs,
+    ) -> None:
+        app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+        super().__init__(
+            app=app,
+            metadata=kwargs.get(
+                "metadata",
+                MetaData(
+                    naming_convention=naming_convention or self.DEFAULT_CONVENTION
+                ),
+            ),
+            engine_options=dict(
+                kwargs.get("engine_options", self.DEFAULT_ENGINE_OPTIONS), echo=echo
+            ),
+            model_class=kwargs.get(
+                "model_class",
+                declarative_base(cls=CustomModel, metaclass=ModBaseMeta),
+            ),
+            **kwargs,
         )
 
-    # TODO find_by_... with reflection or metaclasses
+    def with_autocommit(self, result: v = None) -> v:
+        self.session.commit()
+        return result
 
-    def delete(self, session: Session) -> None:
-        session.delete(self)
-        session.flush()
+    def get_first(self, stmt: Select) -> m | None:
+        return self.session.execute(stmt).scalars().first()
 
+    def get_first_row(self, stmt: Select) -> Row:
+        return self.session.execute(stmt).first()
 
-def create_base(meta: MetaData) -> type[ModBase]:
-    # noinspection PyTypeChecker
-    return declarative_base(metadata=meta, cls=ModBase, metaclass=ModBaseMeta)
+    def get_all(self, stmt: Select) -> list[m]:
+        return self.session.execute(stmt).scalars().all()
+
+    def get_all_rows(self, stmt: Select) -> list[Row]:
+        return self.session.execute(stmt).all()
+
+    def get_paginated(self, stmt: Select, offset: int, limit: int) -> list[m]:
+        return self.get_all(stmt.offset(offset).limit(limit))
+
+    def get_paginated_rows(self, stmt: Select, offset: int, limit: int) -> list[Row]:
+        return self.get_all_rows(stmt.offset(offset).limit(limit))
