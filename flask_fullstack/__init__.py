@@ -5,7 +5,7 @@ from .restx import RequestParser, counter_parser, password_parser
 from .restx import ResourceController, Undefined
 from .restx import ResponseDoc, DateTimeField, Model, PydanticModel
 from .siox import ClientEvent, ServerEvent, DuplexEvent, EventException
-from .siox import EventController, EventSpace, Namespace, SocketIO
+from .siox import EventController, EventSpace, Namespace, SocketIO, SocketIOTestClient
 from .utils import check_code, get_or_pop, dict_cut, dict_reduce, dict_rekey
 from .utils import assert_contains, TypeChecker
 from .utils import IndexService, Searcher, SQLAlchemy, JSONWithSchema, JSONWithModel
