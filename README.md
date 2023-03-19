@@ -48,6 +48,7 @@ For SQLAlchemy, it only supports converting columns of types in the keys of `fla
 - New Columns: JSON with Schema or a RESTX Model to use in New Marshals
 - Named: If some class attribute needs to know the attribute name
 - Other: Utils for dicts, pydantic, pytest, unpacking RESTX responses, TypeEnum, etc
+- [Assert Contains](docs/assert-contains.md): inline-usable pydantic-based validations for testing
 - Core: For simplifying the common project setup steps
 
 ## Future
