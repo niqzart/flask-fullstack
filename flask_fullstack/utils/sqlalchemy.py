@@ -22,6 +22,8 @@ class ModBaseMeta(NamedPropertiesMeta, DeclarativeMeta):
 
 
 class CustomModel(Model):
+    __fsa__: SQLAlchemy
+
     @classmethod
     def create(cls: type[t], **kwargs) -> t:
         entry = cls(**kwargs)
@@ -50,6 +52,13 @@ class CustomModel(Model):
         return cls.__fsa__.get_paginated(
             cls.select_by_kwargs(*order_by, **kwargs), offset, limit
         )
+
+    @classmethod
+    def delete_by_kwargs(cls: type[t], **kwargs) -> bool:
+        entry: t | None = cls.find_first_by_kwargs(**kwargs)
+        if entry is not None:
+            entry.delete()
+        return entry is None
 
     def delete(self) -> None:
         self.__fsa__.session.delete(self)
