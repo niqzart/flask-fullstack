@@ -20,6 +20,7 @@ from flask_restx import Api
 from werkzeug.exceptions import NotFound
 
 from .restx.marshals import flask_restx_has_bad_design
+from .restx.testing import FlaskTestClient
 from .utils import IndexService
 
 SECRETS = (
@@ -31,6 +32,8 @@ SECRETS = (
 
 
 class Flask(_Flask):
+    test_client_class = FlaskTestClient
+
     def __init__(self, *args, versions=None, **kwargs):
         super().__init__(*args, **kwargs)
         if versions is None:
@@ -54,7 +57,7 @@ class Flask(_Flask):
             "jwt": {
                 "type": "apiKey",
                 "in": "cookie",
-                "name": "access_token_cookie"
+                "name": "access_token_cookie",
             }
         } if use_jwt else None
         api = Api(
