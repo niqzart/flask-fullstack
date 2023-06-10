@@ -16,7 +16,17 @@ In this readme you can find:
 - [Planned features](#future)
 
 ## Install
-TBD
+### Add the library to your project
+```sh
+pip install flask-fullstack  # via pip
+poetry add flask-fullstack  # via poetry
+```
+
+### Working with this repository
+```sh
+pip install poetry==1.5.1
+poetry install
+```
 
 ## Quick Start
 TBD
