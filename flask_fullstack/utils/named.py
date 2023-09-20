@@ -7,7 +7,7 @@ class Nameable:
 
 class NamedPropertiesMeta(type):  # TODO ability to override names
     def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, ...]):
-        qual_name = namespace["__qualname__"]
+        qual_name = namespace.get("__qualname__", "no_qualname")
         for item_name, value in namespace.items():
             if isinstance(value, type) and issubclass(value, Nameable):
                 value.name = f"{qual_name}.{item_name}"
