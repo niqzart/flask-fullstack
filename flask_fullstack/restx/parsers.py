@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Hashable
+from collections.abc import Hashable
 
 from flask_restx.reqparse import (
     LOCATIONS,

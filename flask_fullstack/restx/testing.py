@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Iterator, Protocol, Type, Union
+from collections.abc import Iterator
+from typing import Any, Protocol
 
 from flask.testing import FlaskClient as _FlaskClient
 from werkzeug.test import TestResponse
@@ -8,7 +9,7 @@ from werkzeug.test import TestResponse
 from flask_fullstack.utils.contains import TypeChecker
 from flask_fullstack.utils.pytest import check_response
 
-HeaderChecker = dict[str, Union[str, Type[str], None]]
+HeaderChecker = dict[str, str | type[str] | None]
 
 
 class OpenProtocol(Protocol):

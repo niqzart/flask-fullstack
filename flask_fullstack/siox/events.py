@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from functools import wraps
 
 from flask_socketio import emit
-from pydantic import BaseModel, ValidationError
+from pydantic.v1 import BaseModel, ValidationError
 
 from .errors import EventException
 from ..utils import remove_none, render_model, render_packed, unpack_params

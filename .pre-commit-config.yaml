@@ -1,7 +1,7 @@
 # See https://pre-commit.com/ for usage and config
 
 default_language_version:
-  python: python3.9
+  python: python3.11
 
 exclude: ^examples/.*$
 

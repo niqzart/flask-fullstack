@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Self, TypeVar
+from typing import TypeVar
 
-t = TypeVar("t", bound="Identifiable")
+from typing_extensions import Self
+
 v = TypeVar("v")
 
 
