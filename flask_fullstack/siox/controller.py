@@ -5,14 +5,14 @@ from functools import wraps
 
 from pydantic.v1 import BaseModel
 
-from .events import ClientEvent, DuplexEvent, BaseEvent
+from .events import BaseEvent, ClientEvent, DuplexEvent
 from .interfaces import EventGroupBase
 from ..utils import kebabify_model
 
 
 class EventController(EventGroupBase):
     server_kwarg_names = ("include", "exclude", "exclude_none")
-    client_kwarg_names = {n: "ack_" + n for n in server_kwarg_names + ("force_wrap",)}
+    client_kwarg_names = {n: f"ack_{n}" for n in server_kwarg_names + ("force_wrap",)}
     client_kwarg_names["force_ack"] = "force_ack"
     client_kwarg_names["additional_models"] = "additional_models"
 
@@ -38,8 +38,7 @@ class EventController(EventGroupBase):
             event_data: dict = getattr(function, "__event_data__", {})
 
             client_kwargs = {
-                n: event_data.get(v, None)
-                for n, v in self.client_kwarg_names.items()
+                n: event_data.get(v, None) for n, v in self.client_kwarg_names.items()
             }
             client_event = self.ClientEvent(
                 client_model,
@@ -49,8 +48,7 @@ class EventController(EventGroupBase):
 
             if event_data.get("duplex", False):
                 server_kwargs = {
-                    n: event_data.get(n, None)
-                    for n in self.server_kwarg_names
+                    n: event_data.get(n, None) for n in self.server_kwarg_names
                 }
                 server_event = self.ServerEvent(
                     event_data.get("server_model", None) or client_model,
@@ -136,14 +134,14 @@ class EventController(EventGroupBase):
 
         return force_ack_wrapper
 
-    def with_cls(self, cls: type, function: Callable):
+    def with_cls(self, klass: type, function: Callable):
         @wraps(function)
         def with_cls_inner(*args, **kwargs):
-            return function(cls, *args, **kwargs)
+            return function(klass, *args, **kwargs)
 
         return with_cls_inner
 
-    def route(self, cls: type | None = None) -> type:
+    def route(self, outer_klass: type | None = None) -> type:
         # TODO mb move data pre- and post-processing from modes to here
         def route_inner(klass: type) -> type:
             for name, value in klass.__dict__.items():
@@ -167,7 +165,7 @@ class EventController(EventGroupBase):
 
             return klass
 
-        return route_inner if cls is None else route_inner(cls)
+        return route_inner if outer_klass is None else route_inner(outer_klass)
 
 
 class EventSpace:

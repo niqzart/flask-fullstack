@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from datetime import datetime
 from functools import wraps
-from json import dumps, loads
 
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_socketio import join_room
 from pydantic.v1 import BaseModel
 from socketio.exceptions import ConnectionRefusedError
@@ -13,11 +13,10 @@ from socketio.exceptions import ConnectionRefusedError
 from .controller import EventController as _EventController
 from .events import (
     ClientEvent as _ClientEvent,
-    ServerEvent as _ServerEvent,
     DuplexEvent as _DuplexEvent,
+    ServerEvent as _ServerEvent,
 )
-from .structures import EventException
-from .structures import Namespace as _Namespace, SocketIO as _SocketIO
+from .structures import EventException, Namespace as _Namespace, SocketIO as _SocketIO
 from ..base import DatabaseSearcherMixin, JWTAuthorizerMixin
 from ..restx import PydanticModel
 from ..utils import Nameable, TypeEnum, restx_model_to_message
@@ -255,11 +254,11 @@ class CustomJSON:
 
     @staticmethod
     def dumps(*args, **kwargs):
-        return dumps(*args, default=CustomJSON.default, **kwargs)
+        return json.dumps(*args, default=CustomJSON.default, **kwargs)
 
     @staticmethod
     def loads(*args, **kwargs):
-        return loads(*args, **kwargs)
+        return json.loads(*args, **kwargs)
 
 
 class SocketIO(_SocketIO):

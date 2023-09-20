@@ -5,9 +5,8 @@ from flask.testing import FlaskClient
 from flask_socketio.test_client import SocketIOTestClient as _SocketIOTestClient
 
 from flask_fullstack.siox.structures import SocketIO
-from flask_fullstack.utils.contains import assert_contains, TypeChecker
-from flask_fullstack.utils.kebabs import kebabify_string, dekebabify, kebabify
-
+from flask_fullstack.utils.contains import TypeChecker, assert_contains
+from flask_fullstack.utils.kebabs import dekebabify, kebabify, kebabify_string
 
 TypeCheckerDict = dict[str, TypeChecker]
 

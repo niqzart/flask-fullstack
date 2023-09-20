@@ -1,0 +1,62 @@
+[flake8]
+# config
+test-func-name-validator-regex = test_.*
+
+suppress-dummy-args = true
+
+literal-inline-quotes = "double"
+literal-multiline-quotes = "double"
+literal-docstring-quotes = "double"
+literal-include-name = true
+
+# black
+max-line-length = 88
+
+# ignores
+extend-ignore =
+  # not required or shadowed by other plugins
+  D I FI TC Q U101 S101 WPS361 WPS400
+  PT011  # too broad exception in `pytest.raises` (ValueErrors are needed ib pydantic)
+
+  # black
+  WPS348 WPS464 E302 C815
+  # weird
+  PIE803 C101 FNE008 ANN101 ANN102 WPS100 WPS111 WPS338
+  # broken
+  PIE798 WPS226 WPS354 RST304
+  WPS322 WPS428 WPS462  # fails for class-attribute docstrings
+  U100  # fails to understand `raise NotImplementedError`
+  WPS110 VNE002  # screams at variables in overriden methods
+  WPS115  # enums use upper-case constants in classes
+  WPS465  # fails for pipe-union types (bitwise |)
+  P103  # unreadable (what?)
+
+  # too many
+  WPS201 WPS202 WPS210 WPS211 WPS213 WPS214 WPS218 WPS212 WPS221 WPS227 WPS231 WPS232 WPS234 WPS235 WPS229
+
+  # don't block features
+  WPS237  # screams at 'complex' f-strings
+  WPS305  # f-strings are the best
+  WPS306  # python 2.x is deprecated
+  WPS420  # pass is a thing
+  WPS412  # __init__ for libs is required
+  WPS430  # nested functions
+  WPS431  # nested classes
+  WPS501  # try-finally with no except
+  WPS600  # subclassing lowercase builtins
+  WPS602  # @staticmethod
+  WPS604  # some cringe /w banning constructions, including `pass`
+  WPS605  # methods with no arguments
+
+  # preferences
+  WPS337  # multiline conditions
+
+  # TODO transition
+  C812 C816 E501 RST206 B007
+  WPS121 WPS122 WPS220 WPS300 WPS307 WPS332 WPS352 WPS421 WPS432
+  WPS440 WPS441 WPS442 WPS507 WPS601 WPS609 WPS613
+  WPS504 WPS529  # easier
+
+per-file-ignores =
+  __init__.py: F401
+  *test*: SCS108 VNE001 WPS202 WPS317 WPS407 WPS425 WPS432 WPS437 WPS441 WPS442 WPS520

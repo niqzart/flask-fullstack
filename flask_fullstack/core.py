@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import timedelta, datetime, timezone
+from datetime import datetime, timedelta, timezone
 from logging.config import dictConfig
 from os import getenv
 from traceback import format_tb
@@ -10,10 +10,10 @@ from flask import Flask as _Flask, Response, request
 from flask_cors import CORS
 from flask_jwt_extended import (
     JWTManager,
-    get_jwt,
-    set_access_cookies,
     create_access_token,
+    get_jwt,
     get_jwt_identity,
+    set_access_cookies,
     unset_jwt_cookies,
 )
 from flask_restx import Api
@@ -53,13 +53,17 @@ class Flask(_Flask):
 
     def configure_restx(self, use_jwt: bool = True) -> Api:
         self.config["PROPAGATE_EXCEPTIONS"] = True
-        authorizations = {
-            "jwt": {
-                "type": "apiKey",
-                "in": "cookie",
-                "name": "access_token_cookie",
+        authorizations = (
+            {
+                "jwt": {
+                    "type": "apiKey",
+                    "in": "cookie",
+                    "name": "access_token_cookie",
+                }
             }
-        } if use_jwt else None
+            if use_jwt
+            else None
+        )
         api = Api(
             self,
             doc="/doc/",

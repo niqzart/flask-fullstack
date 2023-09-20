@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.event import listen
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql import Select
-from whooshalchemy import Searcher as SearcherBase, IndexService as IndexServiceBase
+from whooshalchemy import IndexService as IndexServiceBase, Searcher as SearcherBase
 
 
 class IndexService(IndexServiceBase):

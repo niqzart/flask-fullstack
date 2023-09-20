@@ -1,10 +1,13 @@
 from .controller import ResourceController, Undefined
+from .marshals import LambdaFieldDef  # DEPRECATED
 from .marshals import (
-    LambdaFieldDef,
+    DateTimeField,
     Marshalable,
+    Model,
+    PydanticModel,
+    ResponseDoc,
     create_marshal_model,
     unite_models,
-)  # DEPRECATED
-from .marshals import ResponseDoc, DateTimeField, Model, PydanticModel
-from .parsers import RequestParser, Argument, counter_parser, password_parser
+)
+from .parsers import Argument, RequestParser, counter_parser, password_parser
 from .testing import FlaskTestClient

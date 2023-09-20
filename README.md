@@ -1,5 +1,5 @@
 # Flask-Fullstack
-Flask-Fullstack is an utils package for projects using a fleet of libs: 
+Flask-Fullstack is an utils package for projects using a fleet of libs:
 - [Flask](https://flask.palletsprojects.com/en/2.2.x/)
 - [Flask-RESTX](https://flask-restx.readthedocs.io/en/latest/)
 - [SQLAlchemy](https://www.sqlalchemy.org/)
@@ -7,8 +7,8 @@ Flask-Fullstack is an utils package for projects using a fleet of libs:
 - [SocketIO](https://socket.io/) & [Flask-SocketIO](https://flask-socketio.readthedocs.io/en/latest/)
 - [pytest](https://docs.pytest.org/en/7.1.x/)
 
-It is currently in deep development, I'd call the current version 0.0.13. 
-Package is maintained by one programmer ([hey that me!](https://github.com/niqzart)). 
+It is currently in deep development.
+Package is maintained by one programmer ([hey that me!](https://github.com/niqzart)).
 In this readme you can find:
 - [Install instructions](#install)
 - [Quick start guide](#quick-start)

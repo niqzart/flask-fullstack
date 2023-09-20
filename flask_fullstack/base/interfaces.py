@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TypeVar
+from typing import Self, TypeVar
 
 t = TypeVar("t", bound="Identifiable")
 v = TypeVar("v")
@@ -19,7 +19,7 @@ class Identifiable:
         pass
 
     @classmethod
-    def find_by_id(cls: type[t], entry_id: int) -> t | None:
+    def find_by_id(cls, entry_id: int) -> Self | None:
         raise NotImplementedError
 
 
@@ -36,7 +36,7 @@ class UserRole:
         pass
 
     @classmethod
-    def find_by_identity(cls: type[t], identity: v) -> t | None:
+    def find_by_identity(cls, identity: v) -> Self | None:
         raise NotImplementedError
 
     def get_identity(self) -> v:

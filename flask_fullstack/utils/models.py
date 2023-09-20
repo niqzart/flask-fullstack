@@ -6,7 +6,8 @@ from flask_restx.fields import Raw
 
 def rename_model_ref_once(key: str, value: str | dict) -> str | dict:
     if key == "$ref":
-        return value.replace("#/definitions", "#/components/messages") + "/payload"
+        value = value.replace("#/definitions", "#/components/messages")
+        return f"{value}/payload"
     elif isinstance(value, dict):
         return rename_model_refs(value)
     return value

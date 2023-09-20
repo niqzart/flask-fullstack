@@ -4,7 +4,7 @@ from typing import Any
 
 from werkzeug.test import TestResponse
 
-from flask_fullstack.utils.contains import assert_contains, TypeChecker
+from flask_fullstack.utils.contains import TypeChecker, assert_contains
 
 
 def check_code(

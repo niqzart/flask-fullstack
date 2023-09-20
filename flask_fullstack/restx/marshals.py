@@ -4,27 +4,27 @@ from abc import ABC
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, date, time
-from typing import get_type_hints, TypeVar, ForwardRef
+from datetime import date, datetime, time
+from typing import ForwardRef, TypeVar, get_type_hints
 
 from flask_restx import Model as _Model, Namespace
 from flask_restx.fields import (
     Boolean as BooleanField,
-    Integer as IntegerField,
     Float as FloatField,
-    String as StringField,
-    Raw as RawField,
-    Nested as NestedField,
+    Integer as IntegerField,
     List as ListField,
+    Nested as NestedField,
+    Raw as RawField,
+    String as StringField,
 )
 from flask_restx.reqparse import RequestParser
 from pydantic.v1 import BaseModel
 from pydantic.v1.fields import ModelField
-from sqlalchemy import Column, Sequence, Float, Date, Time
+from sqlalchemy import Column, Date, Float, Sequence, Time
 from sqlalchemy.sql.type_api import TypeEngine
-from sqlalchemy.types import Boolean, Integer, String, JSON, DateTime, Enum
+from sqlalchemy.types import JSON, Boolean, DateTime, Enum, Integer, String
 
-from ..utils import JSONWithModel, TypeEnum, Nameable
+from ..utils import JSONWithModel, Nameable, TypeEnum
 
 
 class EnumField(StringField):
@@ -154,7 +154,7 @@ def create_fields(
         default = column.default.arg
         required = required or False
 
-    for supported_type, field_type in column_to_field.items():
+    for supported_type, field_type in column_to_field.items():  # noqa: B007
         if isinstance(column.type, supported_type):
             break
     else:
@@ -224,8 +224,13 @@ class LambdaFieldDef:
         return field_type(attribute=self.attribute)
 
 
-def create_marshal_model(model_name: str, *fields: str, inherit: str | None = None,
-                         use_defaults: bool = False, flatten_jsons: bool = False):
+def create_marshal_model(
+    model_name: str,
+    *fields: str,
+    inherit: str | None = None,
+    use_defaults: bool = False,
+    flatten_jsons: bool = False,
+):
     """
     DEPRECATED (in favour OF :class:`Model` below)
 
@@ -336,8 +341,7 @@ class Model(Nameable):
         **named_columns: Column,
     ) -> Callable[[type[t]], type[t]]:
         named_columns = {
-            key.replace("_", "-"): value
-            for key, value in named_columns.items()
+            key.replace("_", "-"): value for key, value in named_columns.items()
         }
 
         # TODO allow different cases
@@ -357,10 +361,12 @@ class Model(Nameable):
                     if not cls.__columns_converted__:
                         if hasattr(super(), "convert_columns"):
                             super().convert_columns()  # noqa
-                        named_columns.update({
-                            column.name.replace("_", "-"): column
-                            for column in columns
-                        })
+                        named_columns.update(
+                            {
+                                column.name.replace("_", "-"): column
+                                for column in columns
+                            }
+                        )
                         for name, column in named_columns.items():
                             fields.update(
                                 create_fields(
@@ -397,7 +403,10 @@ class Model(Nameable):
                 def deconvert_one(cls: type[t], data: dict[str, ...]) -> t:
                     cls.convert_columns()
                     result: cls = super().deconvert_one(data)
-                    for name, column in named_columns.items():  # TODO raise parsing errors
+                    for (
+                        name,
+                        column,
+                    ) in named_columns.items():  # TODO raise parsing errors
                         value = data.get(name, column.default)
                         if (
                             isinstance(column.type, Enum)

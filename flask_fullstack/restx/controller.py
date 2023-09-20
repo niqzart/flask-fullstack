@@ -5,24 +5,24 @@ from functools import wraps
 
 from flask import jsonify
 from flask_jwt_extended import (
-    unset_jwt_cookies,
-    set_access_cookies,
     create_access_token,
     jwt_required,
+    set_access_cookies,
+    unset_jwt_cookies,
 )
-from flask_restx import Namespace, Model as BaseModel, abort as default_abort
+from flask_restx import Model as BaseModel, Namespace, abort as default_abort
 from flask_restx.fields import (
-    List as ListField,
     Boolean as BoolField,
     Integer as IntegerField,
+    List as ListField,
     Nested,
 )
 from flask_restx.marshalling import marshal
 from flask_restx.reqparse import RequestParser
-from flask_restx.utils import unpack, merge
+from flask_restx.utils import merge, unpack
 
-from .marshals import ResponseDoc, Model
-from ..base import UserRole, DatabaseSearcherMixin, JWTAuthorizerMixin
+from .marshals import Model, ResponseDoc
+from ..base import DatabaseSearcherMixin, JWTAuthorizerMixin, UserRole
 
 Undefined = object()
 
@@ -86,7 +86,7 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
         unset_jwt_cookies(response)
         if jwt is not None:
             jwt.pop(auth_name or "")
-            if len(jwt) != 0:
+            if jwt:
                 set_access_cookies(response, create_access_token(identity=jwt))
 
     def adds_authorization(self, auth_name: str = None):
@@ -130,11 +130,13 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
             def argument_inner(*args, **kwargs):
                 kwargs.update(parser.parse_args())
                 if use_undefined:
-                    kwargs.update({
-                        args.dest or args.name: Undefined
-                        for args in parser.args
-                        if (args.dest or args.name) not in kwargs.keys()
-                    })
+                    kwargs.update(
+                        {
+                            args.dest or args.name: Undefined
+                            for args in parser.args
+                            if (args.dest or args.name) not in kwargs.keys()
+                        }
+                    )
                 return function(*args, **kwargs)
 
             return argument_inner
@@ -282,7 +284,7 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
         }
         if count_all is not None or provided_total:
             response["total"] = IntegerField
-        response = BaseModel(f"List" + name, response)
+        response = BaseModel(f"List{name}", response)
         response = ResponseDoc(200, f"Max size of results: {per_request}", response)
 
         def lister_wrapper(function):

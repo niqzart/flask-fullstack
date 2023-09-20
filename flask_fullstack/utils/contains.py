@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Literal, Union, Type, Any
+from typing import Any, Literal, Type, Union
 
-from pydantic.v1 import create_model, Field, ValidationError, BaseModel
+from pydantic.v1 import BaseModel, Field, ValidationError, create_model
 from pydantic.v1.fields import FieldInfo
 
 # TODO redo with | for python 3.10+

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from typing import Iterator, Any, Protocol, Union, Type
+from typing import Any, Iterator, Protocol, Type, Union
 
 from flask.testing import FlaskClient as _FlaskClient
 from werkzeug.test import TestResponse
 
 from flask_fullstack.utils.contains import TypeChecker
 from flask_fullstack.utils.pytest import check_response
-
 
 HeaderChecker = dict[str, Union[str, Type[str], None]]
 
