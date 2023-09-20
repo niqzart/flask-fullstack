@@ -3,12 +3,11 @@ from __future__ import annotations
 from flask import Flask
 from flask.testing import FlaskClient
 from flask_socketio.test_client import SocketIOTestClient as _SocketIOTestClient
+from pydantic_marshals.contains import assert_contains
+from pydantic_marshals.contains.type_aliases import TypeChecker
 
 from flask_fullstack.siox.structures import SocketIO
-from flask_fullstack.utils.contains import TypeChecker, assert_contains
 from flask_fullstack.utils.kebabs import dekebabify, kebabify, kebabify_string
-
-TypeCheckerDict = dict[str, TypeChecker]
 
 
 class SocketIOTestClient(_SocketIOTestClient):
@@ -37,7 +36,7 @@ class SocketIOTestClient(_SocketIOTestClient):
         expected_ack: dict = None,
         expected_code: int = 200,
         expected_message: str | None = None,
-        expected_data: TypeCheckerDict = None,
+        expected_data: TypeChecker = None,
         **kwargs,
     ) -> ...:
         """
@@ -109,7 +108,7 @@ class SocketIOTestClient(_SocketIOTestClient):
         )
 
     def assert_received(
-        self, event_name: str, expected_data: TypeCheckerDict, *, pop: bool = True
+        self, event_name: str, expected_data: TypeChecker, *, pop: bool = True
     ) -> dict:
         """
         Checks if the socket received some event with some data
@@ -143,7 +142,7 @@ class SocketIOTestClient(_SocketIOTestClient):
 
         return event_data
 
-    def assert_only_received(self, event_name: str, data: TypeCheckerDict) -> dict:
+    def assert_only_received(self, event_name: str, data: TypeChecker) -> dict:
         """
         Same as `.assert_received`, but also checks if that's the only received event.
         Checks if the socket received some event with some data and removes it from the queue
@@ -158,7 +157,7 @@ class SocketIOTestClient(_SocketIOTestClient):
     @staticmethod
     def assert_broadcast(
         event_name: str,
-        data: TypeCheckerDict,
+        data: TypeChecker,
         *clients: SocketIOTestClient,
         pop: bool = True,
     ) -> None:

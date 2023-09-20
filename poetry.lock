@@ -1165,6 +1165,20 @@ files = [
 typing-extensions = ">=4.6.0,<4.7.0 || >4.7.0"
 
 [[package]]
+name = "pydantic-marshals"
+version = "0.2.1"
+description = "Library for creating partial pydantic models (automatic converters) from different mappings"
+optional = false
+python-versions = ">=3.10,<4.0"
+files = [
+    {file = "pydantic_marshals-0.2.1-py3-none-any.whl", hash = "sha256:4155501d15fbe9054c9f5c250e1057a00e3085d77028cb4d817345450842c401"},
+    {file = "pydantic_marshals-0.2.1.tar.gz", hash = "sha256:7c8c3b1137ce6d72b9a8c44c8874e90c0604982beeeac56f705421b3d6304f67"},
+]
+
+[package.dependencies]
+pydantic = ">=2.0,<3.0"
+
+[[package]]
 name = "pydocstyle"
 version = "6.3.0"
 description = "Python docstring style checker"
@@ -1757,4 +1771,4 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "59cb2fea94ec1ee120bf285d9ce06c905c53c0cc341077d2ef3d946365b6b7b4"
+content-hash = "5fc15486fa38948a031bf4f5e5c59068451ab47edc1c8ddbee9f14f80e8f3508"

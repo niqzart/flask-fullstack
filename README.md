@@ -6,6 +6,7 @@ Flask-Fullstack is an utils package for projects using a fleet of libs:
 - [Flask-SQLAlchemy](https://flask-sqlalchemy.palletsprojects.com/en/3.0.x/)
 - [SocketIO](https://socket.io/) & [Flask-SocketIO](https://flask-socketio.readthedocs.io/en/latest/)
 - [pytest](https://docs.pytest.org/en/7.1.x/)
+- [pydantic-marshals](https://github.com/niqzart/pydantic-marshals)
 
 It is currently in deep development.
 Package is maintained by one programmer ([hey that me!](https://github.com/niqzart)).
@@ -41,7 +42,7 @@ TBD
 - [Upgraded Parsers](./docs/upgraded-parsers.md): just a couple of commonly used parsers to `.copy()`
 - Resource Controller: RESTX's Namespace, but with access to useful decorators from mixins
 
-#### New Models
+#### New Marshals
 New models, created in `flask_fullstack.restx.marshals`, are a translation layer between Pydantic & RESTX's own Models. These models also support being created from SQLAlchemy tables via Column reflection
 
 For Pydantic, it only supports as fields: the keys of `flask_fullstack.restx.marshals.type_to_field`, `list`s and nesting other Pydantic models
@@ -58,7 +59,6 @@ For SQLAlchemy, it only supports converting columns of types in the keys of `fla
 - New Columns: JSON with Schema or a RESTX Model to use in New Marshals
 - Named: If some class attribute needs to know the attribute name
 - Other: Utils for dicts, pydantic, pytest, unpacking RESTX responses, TypeEnum, etc
-- [Assert Contains](docs/assert-contains.md): inline-usable pydantic-based validations for testing
 - Core: For simplifying the common project setup steps
 
 ## Future
