@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "flask-fullstack"
-version = "0.5.1"
+version = "0.5.3"
 description = "A utility package for projects using flask, sqlalchemy, socketio and pytest"
 authors = ["niqzart <niqzart@gmail.com>"]
 readme = "README.md"
@@ -14,13 +14,13 @@ exclude = [
 
 [tool.poetry.dependencies]
 python = "^3.10"
-werkzeug = ">=2.3.2,<2.4.0"
-flask = ">=2.3.2,<2.4.0"
+werkzeug = ">=2.2.0,<2.4.0"
+flask = ">=2.2.0,<2.4.0"
 flask-cors = ">=3.0.10,<3.1.0"
 flask-jwt-extended = ">=4.5.2,<4.6.0"
 flask-restx = ">=1.0.3,<1.1.0"
 flask-sqlalchemy = ">=3.0.3,<3.1.0"
-flask-socketio = ">=5.3.3,<5.4.0"
+flask-socketio = ">=5.1.2,<5.4.0"
 pydantic = ">=2.0,<3.0"
 sqlalchemy = ">=1.4.31,<1.5.0"
 whoosh = ">=2.7.4,<2.8.0"
