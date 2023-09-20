@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from collections.abc import Iterable, Callable
+from collections.abc import Callable, Iterable
 
-from pydantic import BaseModel
+from pydantic.v1 import BaseModel
 
-from .events import BaseEvent, ClientEvent, ServerEvent, DuplexEvent
+from .events import BaseEvent, ClientEvent, DuplexEvent, ServerEvent  # noqa: F401
 
 
 class EventGroupBase:
     ClientEvent: type[ClientEvent] = ClientEvent
-    ServerEvent: type[ServerEvent] = ServerEvent
+    ServerEvent: type[ServerEvent] = ServerEvent  # noqa: F811
     DuplexEvent: type[DuplexEvent] = DuplexEvent
 
     def __init__(self, namespace: str = None, use_kebab_case: bool = False):

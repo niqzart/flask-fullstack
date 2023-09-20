@@ -4,27 +4,28 @@ from abc import ABC
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, date, time
-from typing import get_type_hints, TypeVar, ForwardRef
+from datetime import date, datetime, time
+from typing import ForwardRef, TypeVar, get_type_hints
 
 from flask_restx import Model as _Model, Namespace
 from flask_restx.fields import (
     Boolean as BooleanField,
-    Integer as IntegerField,
     Float as FloatField,
-    String as StringField,
-    Raw as RawField,
-    Nested as NestedField,
+    Integer as IntegerField,
     List as ListField,
+    Nested as NestedField,
+    Raw as RawField,
+    String as StringField,
 )
 from flask_restx.reqparse import RequestParser
-from pydantic import BaseModel
-from pydantic.fields import ModelField
-from sqlalchemy import Column, Sequence, Float, Date, Time
+from pydantic.v1 import BaseModel
+from pydantic.v1.fields import ModelField
+from sqlalchemy import Column, Date, Float, Sequence, Time
 from sqlalchemy.sql.type_api import TypeEngine
-from sqlalchemy.types import Boolean, Integer, String, JSON, DateTime, Enum
+from sqlalchemy.types import JSON, Boolean, DateTime, Enum, Integer, String
+from typing_extensions import Self
 
-from ..utils import JSONWithModel, TypeEnum, Nameable
+from ..utils import JSONWithModel, Nameable, TypeEnum
 
 
 class EnumField(StringField):
@@ -154,7 +155,7 @@ def create_fields(
         default = column.default.arg
         required = required or False
 
-    for supported_type, field_type in column_to_field.items():
+    for supported_type, field_type in column_to_field.items():  # noqa: B007
         if isinstance(column.type, supported_type):
             break
     else:
@@ -224,8 +225,13 @@ class LambdaFieldDef:
         return field_type(attribute=self.attribute)
 
 
-def create_marshal_model(model_name: str, *fields: str, inherit: str | None = None,
-                         use_defaults: bool = False, flatten_jsons: bool = False):
+def create_marshal_model(
+    model_name: str,
+    *fields: str,
+    inherit: str | None = None,
+    use_defaults: bool = False,
+    flatten_jsons: bool = False,
+):
     """
     DEPRECATED (in favour OF :class:`Model` below)
 
@@ -336,8 +342,7 @@ class Model(Nameable):
         **named_columns: Column,
     ) -> Callable[[type[t]], type[t]]:
         named_columns = {
-            key.replace("_", "-"): value
-            for key, value in named_columns.items()
+            key.replace("_", "-"): value for key, value in named_columns.items()
         }
 
         # TODO allow different cases
@@ -357,10 +362,12 @@ class Model(Nameable):
                     if not cls.__columns_converted__:
                         if hasattr(super(), "convert_columns"):
                             super().convert_columns()  # noqa
-                        named_columns.update({
-                            column.name.replace("_", "-"): column
-                            for column in columns
-                        })
+                        named_columns.update(
+                            {
+                                column.name.replace("_", "-"): column
+                                for column in columns
+                            }
+                        )
                         for name, column in named_columns.items():
                             fields.update(
                                 create_fields(
@@ -377,7 +384,7 @@ class Model(Nameable):
                 # TODO make model's ORM attributes usable (__init__?)
                 #   XOR use class properties for Columns in a different way
                 @classmethod
-                def convert_one(cls: type[t], orm_object, **context) -> t:
+                def convert_one(cls, orm_object, **context) -> Self:
                     cls.convert_columns()
                     result: cls = super().convert_one(orm_object, **context)
                     for name, column in named_columns.items():
@@ -394,10 +401,13 @@ class Model(Nameable):
                     return dict(super().model(), **fields)
 
                 @classmethod
-                def deconvert_one(cls: type[t], data: dict[str, ...]) -> t:
+                def deconvert_one(cls, data: dict[str, ...]) -> Self:
                     cls.convert_columns()
                     result: cls = super().deconvert_one(data)
-                    for name, column in named_columns.items():  # TODO raise parsing errors
+                    for (
+                        name,
+                        column,
+                    ) in named_columns.items():  # TODO raise parsing errors
                         value = data.get(name, column.default)
                         if (
                             isinstance(column.type, Enum)
@@ -470,7 +480,7 @@ class Model(Nameable):
         def include_nest_model_inner(cls: type[t]) -> type[t]:
             class ModModel(cls):
                 @classmethod
-                def convert_one(cls: type[t], orm_object, **context) -> t:
+                def convert_one(cls, orm_object, **context) -> Self:
                     nested = getattr(orm_object, parameter_name)
                     if as_list:
                         nested = [model.convert_one(item, **context) for item in nested]
@@ -500,7 +510,7 @@ class Model(Nameable):
                     )
 
                 @classmethod
-                def deconvert_one(cls: type[t], data: dict[str, ...]) -> t:
+                def deconvert_one(cls, data: dict[str, ...]) -> Self:
                     result: cls = super().deconvert_one(data)
                     object.__setattr__(result, parameter_name, data[field_name])
                     return result
@@ -544,7 +554,7 @@ class Model(Nameable):
         def include_flat_nest_model_inner(cls: type[t]) -> type[t]:
             class ModModel(cls):
                 @classmethod
-                def convert_one(cls: type[t], orm_object, **context) -> t:
+                def convert_one(cls, orm_object, **context) -> Self:
                     result: cls = super().convert_one(orm_object, **context)
                     nested = getattr(orm_object, parameter_name)
                     if nested is not None:
@@ -562,7 +572,7 @@ class Model(Nameable):
                     return dict(super().model(), **model.model())
 
                 @classmethod
-                def deconvert_one(cls: type[t], data: dict[str, ...]) -> t:
+                def deconvert_one(cls, data: dict[str, ...]) -> Self:
                     raise NotImplementedError(
                         "Inner flattened model deconverting is not supported yet"
                     )
@@ -610,7 +620,7 @@ class Model(Nameable):
         def include_context_inner(cls: type[t]) -> type[t]:
             class ModModel(cls):
                 @classmethod
-                def convert_one(cls: type[t], orm_object, **context) -> t:
+                def convert_one(cls, orm_object, **context) -> Self:
                     assert all(
                         (value := context.get(name, None)) is not None
                         and isinstance(value, var_type)
@@ -623,11 +633,11 @@ class Model(Nameable):
         return include_context_inner
 
     @classmethod
-    def convert_one(cls: type[t], orm_object, **context) -> t:
+    def convert_one(cls, orm_object, **context) -> Self:
         raise NotImplementedError()
 
     @classmethod
-    def convert(cls: type[t], orm_object, **context) -> t:
+    def convert(cls, orm_object, **context) -> Self:
         if isinstance(orm_object, cls):  # already converted
             return orm_object
         return cls.convert_one(orm_object, **context)
@@ -637,12 +647,12 @@ class Model(Nameable):
         raise NotImplementedError()
 
     @classmethod
-    def deconvert_one(cls: type[t], data: dict[str, ...]) -> t:
+    def deconvert_one(cls, data: dict[str, ...]) -> Self:
         # TODO version of deconvert for parsing (see argument parser as well)
         raise NotImplementedError()
 
     @classmethod
-    def deconvert(cls: type[t], data: t | dict[str, ...]) -> t:
+    def deconvert(cls, data: t | dict[str, ...]) -> Self:
         if isinstance(data, cls):  # already deconverted
             return data
         return cls.deconvert_one(data)
@@ -714,13 +724,13 @@ class PydanticModel(BaseModel, Model, ABC):
         return result
 
     @classmethod
-    def convert_one(cls: type[t], orm_object, **context) -> t:
+    def convert_one(cls, orm_object, **context) -> Self:
         return cls(**cls.dict_convert(orm_object, **context))
 
     @classmethod
-    def parse_obj(cls: type[t], obj: ...) -> t:  # TODO seems like recursion...
+    def model_validate(cls, obj: ...) -> Self:  # TODO seems like recursion...
         return cls.deconvert(obj)
 
     @classmethod
-    def deconvert_one(cls: type[t], data: dict[str, ...]) -> t:
+    def deconvert_one(cls, data: dict[str, ...]) -> Self:
         return super().parse_obj(data)

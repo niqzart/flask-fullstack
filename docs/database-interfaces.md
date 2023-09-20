@@ -32,7 +32,7 @@ class Admin(UserRole):
         self.code = code
         self.username = username
         admin_collection[code] = self
-    
+
     @classmethod
     def find_by_identity(cls, identity: str) -> Admin | None:
         return admin_collection.get(identity)

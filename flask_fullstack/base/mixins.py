@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABCMeta
 from functools import wraps
 
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from ..base import Identifiable, UserRole
 from ..utils import get_or_pop
@@ -48,7 +48,7 @@ class DatabaseSearcherMixin(AbstractAbortMixin, metaclass=ABCMeta):
         :param error_code: (default: " 404") an override for the documentation code for a not-found error
         """
         if input_field_name is None:
-            input_field_name = identifiable.__name__.lower() + "_id"
+            input_field_name = f"{identifiable.__name__.lower()}_id"
         if result_field_name is None:
             result_field_name = identifiable.__name__.lower()
 
@@ -130,10 +130,9 @@ class JWTAuthorizerMixin(AbstractAbortMixin, metaclass=ABCMeta):
             @jwt_required(optional=optional)
             @wraps(function)
             def authorizer_inner(*args, **kwargs):
-                if (
-                    (t := self._get_identity()) is None
-                    or (identity := t.get(auth_name, None)) is None
-                ):
+                if (t := self._get_identity()) is None or (
+                    identity := t.get(auth_name, None)
+                ) is None:
                     if optional:
                         kwargs[role.__name__.lower()] = None
                         return function(*args, **kwargs)

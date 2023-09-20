@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import Hashable
+from collections.abc import Hashable
 
 from flask_restx.reqparse import (
-    RequestParser as BaseRequestParser,
-    Argument as BaseArgument,
     LOCATIONS,
     PY_TYPES,
+    Argument as BaseArgument,
     ParseResult,
+    RequestParser as BaseRequestParser,
 )
 
 
@@ -15,7 +15,7 @@ class Argument(BaseArgument):
     @property
     def __schema__(self):
         if self.location == "cookie":
-            return
+            return None
         param = {"name": self.name, "in": LOCATIONS.get(self.location, "query")}
 
         if isinstance(self.type, Hashable) and self.type in PY_TYPES:

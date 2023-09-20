@@ -5,10 +5,10 @@ from dataclasses import dataclass
 from functools import wraps
 
 from flask_socketio import emit
-from pydantic import BaseModel, ValidationError
+from pydantic.v1 import BaseModel, ValidationError
 
 from .errors import EventException
-from ..utils import remove_none, unpack_params, render_model, render_packed
+from ..utils import remove_none, render_model, render_packed, unpack_params
 
 
 class BaseEvent:  # do not instantiate!
@@ -116,15 +116,13 @@ class ClientEvent(Event):
 
     def _handler(self, function: Callable[..., dict]):
         if self.forced_ack or self.ack_model is not None:
+
             @wraps(function)
             def _handler_inner(*args, **kwargs):
                 return self._ack_response(function(*args, **kwargs))
-        else:
-            @wraps(function)
-            def _handler_inner(*args, **kwargs):
-                return function(*args, **kwargs)
 
-        return _handler_inner
+            return _handler_inner
+        return function
 
     def bind(self, function):
         self.handler = self._handler(function)
@@ -169,7 +167,7 @@ class ClientEvent(Event):
             )
             data = {"$ref": f"#/components/messages/{model_name}/payload"}
         return {
-            "name": self.name + "-ack",
+            "name": f"{self.name}-ack",
             "payload": {
                 "type": "object",
                 "required": ["code"] if self.forced_ack else ["code", "data"],
@@ -353,6 +351,7 @@ class DuplexEvent(BaseEvent):
 
     def bind(self, function: Callable[..., dict]):
         if self.use_event:
+
             @wraps(function)
             def duplex_handler(*args, **kwargs):
                 return function(*args, event=self, **kwargs)

@@ -7,7 +7,7 @@ from flask_sqlalchemy import SQLAlchemy as _SQLAlchemy
 from flask_sqlalchemy.model import Model
 from sqlalchemy import MetaData, select
 from sqlalchemy.engine import Row
-from sqlalchemy.orm import declarative_base, DeclarativeMeta
+from sqlalchemy.orm import DeclarativeMeta, declarative_base
 from sqlalchemy.sql import Select
 
 from .named import NamedPropertiesMeta

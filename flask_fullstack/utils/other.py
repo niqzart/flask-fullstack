@@ -6,7 +6,7 @@ from .dicts import remove_none
 
 
 @property
-def NotImplementedField(_):
+def NotImplementedField(_):  # noqa: N802 WPS614
     raise NotImplementedError
 
 

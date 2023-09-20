@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic_marshals.contains import assert_contains
+from pydantic_marshals.contains.type_aliases import TypeChecker
 from werkzeug.test import TestResponse
-
-from flask_fullstack.utils.contains import assert_contains, TypeChecker
 
 
 def check_code(
@@ -21,8 +21,8 @@ def check_response(
     expected_status: int = 200,
     expected_data: Any | None = None,
     expected_text: str | None = None,
-    expected_json: TypeChecker | None = None,
-    expected_headers: TypeChecker | None = None,
+    expected_json: TypeChecker = None,
+    expected_headers: TypeChecker = None,
     get_json: bool = True,
 ) -> None | dict | list | TestResponse:
     assert response.status_code == expected_status, response.get_json()
