@@ -7,7 +7,7 @@ from json import dumps, loads
 
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_socketio import join_room
-from pydantic import BaseModel
+from pydantic.v1 import BaseModel
 from socketio.exceptions import ConnectionRefusedError
 
 from .controller import EventController as _EventController

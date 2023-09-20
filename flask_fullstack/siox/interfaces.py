@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from collections.abc import Iterable, Callable
 
-from pydantic import BaseModel
+from pydantic.v1 import BaseModel
 
 from .events import BaseEvent, ClientEvent, ServerEvent, DuplexEvent
 

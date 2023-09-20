@@ -18,8 +18,8 @@ from flask_restx.fields import (
     List as ListField,
 )
 from flask_restx.reqparse import RequestParser
-from pydantic import BaseModel
-from pydantic.fields import ModelField
+from pydantic.v1 import BaseModel
+from pydantic.v1.fields import ModelField
 from sqlalchemy import Column, Sequence, Float, Date, Time
 from sqlalchemy.sql.type_api import TypeEngine
 from sqlalchemy.types import Boolean, Integer, String, JSON, DateTime, Enum
@@ -718,7 +718,7 @@ class PydanticModel(BaseModel, Model, ABC):
         return cls(**cls.dict_convert(orm_object, **context))
 
     @classmethod
-    def parse_obj(cls: type[t], obj: ...) -> t:  # TODO seems like recursion...
+    def model_validate(cls: type[t], obj: ...) -> t:  # TODO seems like recursion...
         return cls.deconvert(obj)
 
     @classmethod

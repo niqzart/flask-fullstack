@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from functools import wraps
 
-from pydantic import BaseModel
+from pydantic.v1 import BaseModel
 
 from .events import ClientEvent, DuplexEvent, BaseEvent
 from .interfaces import EventGroupBase

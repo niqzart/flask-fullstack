@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic.v1 import BaseModel
 
 
 def render_model(model: type[BaseModel], data, **kwargs) -> dict:
