@@ -68,7 +68,10 @@ type_to_field: dict[type, type[RawField]] = {
     int: IntegerField,
     float: FloatField,
     str: StringField,
+    dict: JSONLoadableField,
     JSON: JSONLoadableField,
+    time: TimeField,
+    date: DateField,
     datetime: DateTimeField,
 }
 

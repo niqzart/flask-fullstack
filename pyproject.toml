@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "flask-fullstack"
-version = "0.5.6"
+version = "0.5.7"
 description = "A utility package for projects using flask, sqlalchemy, socketio and pytest"
 authors = ["niqzart <niqzart@gmail.com>"]
 readme = "README.md"
