@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
-from logging.config import dictConfig
 from os import getenv
 from traceback import format_tb
 
@@ -21,7 +20,6 @@ from werkzeug.exceptions import NotFound
 
 from .restx.marshals import flask_restx_has_bad_design
 from .restx.testing import FlaskTestClient
-from .utils import IndexService
 
 SECRETS = (
     "SECRET_KEY",
@@ -168,16 +166,3 @@ class Flask(_Flask):
             return response
 
         return jwt
-
-
-def configure_logging(config: dict):
-    dictConfig(config)
-
-
-def configure_whooshee(session, whoosh_base: str):
-    whooshee_config = {
-        "WHOOSHEE_MIN_STRING_LEN": 0,
-        "WHOOSHEE_ENABLE_INDEXING": True,
-        "WHOOSH_BASE": whoosh_base,
-    }
-    return IndexService(config=whooshee_config, session=session)
