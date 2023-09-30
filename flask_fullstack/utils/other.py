@@ -27,7 +27,11 @@ class TypeEnumInput:
 
 class TypeEnum(Enum):
     @classmethod
-    def from_string(cls, string: str) -> TypeEnum | None:  # TODO NonePointer!!!
+    def from_string(
+        cls, string: TypeEnum | str
+    ) -> TypeEnum | None:  # TODO NonePointer!!!
+        if isinstance(string, cls):
+            return string
         return cls.__members__.get(string.upper().replace("-", "_"), None)
 
     @classmethod
