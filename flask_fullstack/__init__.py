@@ -1,5 +1,5 @@
 from .base import Identifiable, UserRole
-from .core import Flask, configure_logging, configure_whooshee
+from .core import Flask
 from .restx import (
     DateTimeField,
     FlaskTestClient,
@@ -24,14 +24,11 @@ from .siox import (
     SocketIOTestClient,
 )
 from .utils import (
-    IndexService,
     JSONWithModel,
-    JSONWithSchema,
     Nameable,
     NamedProperties,
     NamedPropertiesMeta,
     NotImplementedField,
-    Searcher,
     SQLAlchemy,
     TypeEnum,
     check_code,

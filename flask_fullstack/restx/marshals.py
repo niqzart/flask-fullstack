@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from abc import ABC
-from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, time
-from typing import ForwardRef, TypeVar, get_type_hints
+from typing import ForwardRef, TypeVar
 
 from flask_restx import Model as _Model, Namespace
 from flask_restx.fields import (
@@ -196,112 +195,9 @@ def create_fields(
     return {name: field}
 
 
-# fmt: off
-@dataclass()
-class LambdaFieldDef:
-    """
-    DEPRECATED (in favour OF :class:`Model` below)
-
-    A field to be used in create_marshal_model, which can't be described as a :class:`Column`.
-
-    - model_name — global name of the model to connect the field to.
-    - field_type — field's return type (:class:`bool`, :class:`int`, :class:`str` or :class:`datetime`).
-    - attribute — the attribute to pass to the field's keyword argument ``attribute``.
-      can be a :class:`Callable` that uses models pre-marshalled version.
-    """
-
-    model_name: str
-    field_type: type
-    attribute: str | Callable
-    name: str | None = None
-
-    def to_field(self) -> type[RawField] | RawField:
-        field_type: type[RawField]
-        for supported_type, field_type in type_to_field.items():
-            if issubclass(self.field_type, supported_type):
-                break
-        else:
-            field_type = RawField
-        return field_type(attribute=self.attribute)
-
-
-def create_marshal_model(
-    model_name: str,
-    *fields: str,
-    inherit: str | None = None,
-    use_defaults: bool = False,
-    flatten_jsons: bool = False,
-):
-    """
-    DEPRECATED (in favour OF :class:`Model` below)
-
-    - Adds a marshal model to a database object, marked as :class:`Marshalable`.
-    - Automatically adds all :class:`LambdaFieldDef`-marked class fields to the model.
-    - Sorts modules keys by alphabet and puts ``id`` field on top if present.
-    - Uses kebab-case for json-names.
-
-    :param model_name: the **global** name for the new model or model to be overwritten.
-    :param fields: filed names of columns to be added to the model.
-    :param inherit: model name to inherit fields from.
-    :param use_defaults: whether to describe columns' defaults in the model.
-    :param flatten_jsons: whether to put inner JSON fields in the root model or as a Nested field
-    """
-
-    def create_marshal_model_wrapper(cls):
-        model_dict = {} if inherit is None else cls.marshal_models[inherit].copy()
-
-        model_dict.update({
-            k: v
-            for column in cls.__table__.columns
-            if column.name in fields
-            for k, v in create_fields(column, column.name.replace("_", "-"), use_defaults, flatten_jsons).items()
-        })
-
-        model_dict.update({
-            field_name.replace("_", "-") if field.name is None else field.name: field.to_field()
-            for field_name, field_type in get_type_hints(cls).items()
-            if isinstance(field_type, type) and issubclass(field_type, LambdaFieldDef)
-            if (field := getattr(cls, field_name)).model_name == model_name
-        })
-
-        cls.marshal_models[model_name] = OrderedDict(sorted(model_dict.items()))
-        if "id" in cls.marshal_models[model_name]:
-            cls.marshal_models[model_name].move_to_end("id", last=False)
-
-        return cls
-
-    return create_marshal_model_wrapper
-
-
-class Marshalable:
-    """ DEPRECATED (in favour OF :class:`Model` below)
-    Marker-class for classes that can be decorated with ``create_marshal_model``
-    """
-    marshal_models: dict[str, OrderedDict[str, type[RawField]]] = {}
-
-
-def unite_models(*models: dict[str, type[RawField] | RawField]):
-    """
-    - Unites several field dicts (models) into one.
-    - If some fields are present in more than one model, the last encounter will be used.
-    - Sorts modules keys by alphabet and puts ``id`` field on top if present.
-
-    :param models: models (dicts of field definitions) to unite
-    :return: united model with all fields
-    """
-
-    model_dict: OrderedDict = OrderedDict()
-    for model in models:
-        model_dict.update(model)
-    model_dict = OrderedDict(sorted(model_dict.items()))
-    if "id" in model_dict:
-        model_dict.move_to_end("id", last=False)
-    return model_dict
-
-
 @dataclass()
 class ResponseDoc:
-    """ Dataclass to keep the response description is one place """
+    """Dataclass to keep the response description is one place"""
 
     code: int | str = 200
     description: str = None
@@ -309,7 +205,10 @@ class ResponseDoc:
 
     @classmethod
     def error_response(cls, code: int | str, description: str) -> ResponseDoc:
-        """ Creates an instance of an :class:`ResponseDoc` with a message response model for the response body """
+        """
+        Creates an instance of an :class:`ResponseDoc` with
+        a message response model for the response body
+        """
         return cls(code, description)
 
     def register_model(self, ns: Namespace):
@@ -320,7 +219,6 @@ class ResponseDoc:
         if self.model is None:
             return self.code, self.description
         return self.code, self.description, self.model
-# fmt: on
 
 
 t = TypeVar("t", bound="Model")

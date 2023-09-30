@@ -88,16 +88,16 @@ class SQLAlchemy(_SQLAlchemy):
         app.config["SQLALCHEMY_DATABASE_URI"] = db_url
         super().__init__(
             app=app,
-            metadata=kwargs.get(
+            metadata=kwargs.pop(
                 "metadata",
                 MetaData(
                     naming_convention=naming_convention or self.DEFAULT_CONVENTION
                 ),
             ),
             engine_options=dict(
-                kwargs.get("engine_options", self.DEFAULT_ENGINE_OPTIONS), echo=echo
+                kwargs.pop("engine_options", self.DEFAULT_ENGINE_OPTIONS), echo=echo
             ),
-            model_class=kwargs.get(
+            model_class=kwargs.pop(
                 "model_class",
                 declarative_base(cls=CustomModel, metaclass=ModBaseMeta),
             ),
