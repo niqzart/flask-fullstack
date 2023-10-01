@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from functools import wraps
+from typing import Any
 
 from flask import jsonify
 from flask_jwt_extended import (
@@ -20,8 +21,9 @@ from flask_restx.fields import (
 from flask_restx.marshalling import marshal
 from flask_restx.reqparse import RequestParser
 from flask_restx.utils import merge, unpack
+from pydantic import BaseModel as BaseModelV2
 
-from .marshals import Model, ResponseDoc
+from .marshals import Model, ResponseDoc, v2_model_to_ffs
 from ..base import DatabaseSearcherMixin, JWTAuthorizerMixin, UserRole
 
 Undefined = object()
@@ -174,7 +176,7 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
     def marshal_with(
         self,
-        fields: BaseModel | type[Model],
+        fields: BaseModel | type[Model] | type[BaseModelV2],
         as_list=False,
         skip_none=True,
         *args,
@@ -182,7 +184,9 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
     ):
         result = super().marshal_with
 
-        if isinstance(fields, type) and issubclass(fields, Model):
+        if self.is_registrable(fields):
+            if issubclass(fields, BaseModelV2):
+                fields = v2_model_to_ffs(fields)
             model = self.models.get(fields.name, None) or self.model(model=fields)
 
             def marshal_with_wrapper(function: Callable) -> Callable[..., Model]:
@@ -206,7 +210,9 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
         return result(fields, as_list, *args, skip_none=skip_none, **kwargs)
 
     def marshal(self, data, fields: type[Model] | ..., context=None, *args, **kwargs):
-        if isinstance(fields, type) and issubclass(fields, Model):
+        if self.is_registrable(fields):
+            if issubclass(fields, BaseModelV2):
+                fields = v2_model_to_ffs(fields)
             if isinstance(data, Sequence):
                 data = [fields.convert(d, **context or {}) for d in data]
             else:
@@ -216,12 +222,13 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
     def marshal_with_authorization(
         self,
-        fields: BaseModel | type[Model],
+        fields: BaseModel | type[Model] | type[BaseModelV2],
         as_list: bool = False,
         auth_name: str = None,
         **kwargs,
     ):
-        model = self.models.get(fields.name, None) or self.model(model=fields)
+        name = getattr(fields, "name", fields.__name__)
+        model = self.models.get(name, None) or self.model(model=fields)
 
         def marshal_with_authorization_wrapper(function):
             doc = {
@@ -252,7 +259,7 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
     def lister(
         self,
         per_request: int,
-        marshal_model: BaseModel | type[Model],
+        marshal_model: BaseModel | type[Model] | type[BaseModelV2],
         skip_none: bool = True,
         count_all: Callable[..., int] | None = None,
         provided_total: bool = False,
@@ -271,8 +278,8 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
         :param provided_total:
         :return:
         """
-        if isinstance(marshal_model, type) and issubclass(marshal_model, Model):
-            name = marshal_model.name
+        if self.is_registrable(marshal_model):
+            name = getattr(marshal_model, "name", marshal_model.__name__)
             model = self.models.get(name, None) or self.model(model=marshal_model)
         else:
             name = marshal_model.name
@@ -327,9 +334,16 @@ class ResourceController(Namespace, DatabaseSearcherMixin, JWTAuthorizerMixin):
 
         return lister_wrapper
 
+    def is_registrable(self, model: Any) -> bool:
+        return isinstance(model, type) and (
+            issubclass(model, Model) or issubclass(model, BaseModelV2)
+        )
+
     def model(self, name: str = None, model=None, **kwargs):
         # TODO recursive registration
-        if isinstance(model, type) and issubclass(model, Model):
+        if self.is_registrable(model):
+            if issubclass(model, BaseModelV2):
+                model = v2_model_to_ffs(model)
             if model.name is None:
                 model.name = name or model.__qualname__
             return super().model(name or model.name, model.model(), **kwargs)

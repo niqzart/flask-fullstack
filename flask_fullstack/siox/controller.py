@@ -3,10 +3,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from functools import wraps
 
+from pydantic import BaseModel as BaseModelV2
 from pydantic.v1 import BaseModel
+from pydantic_marshals.utils import is_subtype
 
 from .events import BaseEvent, ClientEvent, DuplexEvent
 from .interfaces import EventGroupBase
+from ..restx.marshals import v2_model_to_ffs
 from ..utils import kebabify_model
 
 
@@ -31,7 +34,12 @@ class EventController(EventGroupBase):
             kebabify_model(model)
         self._bind_model(model)
 
-    def argument_parser(self, client_model: type[BaseModel] = BaseModel):
+    def argument_parser(
+        self, client_model: type[BaseModel] | type[BaseModelV2] = BaseModel
+    ):
+        if is_subtype(client_model, BaseModelV2):
+            client_model = v2_model_to_ffs(client_model)
+
         self._maybe_bind_model(client_model)
 
         def argument_parser_wrapper(function: Callable) -> ClientEvent | DuplexEvent:
@@ -69,12 +77,15 @@ class EventController(EventGroupBase):
 
     def mark_duplex(
         self,
-        server_model: type[BaseModel] = None,
+        server_model: type[BaseModel] | type[BaseModelV2] = None,
         use_event: bool = None,
         include: set[str] = None,
         exclude: set[str] = None,
         exclude_none: bool = None,
     ):
+        if is_subtype(server_model, BaseModelV2):
+            server_model = v2_model_to_ffs(server_model)
+
         self._maybe_bind_model(server_model)
         server_kwargs = {
             "include": include,
@@ -99,20 +110,24 @@ class EventController(EventGroupBase):
 
     def _marshal_ack_wrapper(
         self,
-        ack_model: type[BaseModel],
+        ack_model: type[BaseModel] | type[BaseModelV2],
         ack_kwargs: dict,
         function: Callable,
     ) -> Callable:
+        if is_subtype(ack_model, BaseModelV2):
+            ack_model = v2_model_to_ffs(ack_model)
         return self._update_event_data(function, dict(ack_kwargs, ack_model=ack_model))
 
     def marshal_ack(
         self,
-        ack_model: type[BaseModel],
+        ack_model: type[BaseModel] | type[BaseModelV2],
         include: set[str] = None,
         exclude: set[str] = None,
         force_wrap: bool = None,
         exclude_none: bool = None,
     ):
+        if is_subtype(ack_model, BaseModelV2):
+            ack_model = v2_model_to_ffs(ack_model)
         self._maybe_bind_model(ack_model)
         ack_kwargs = {
             "ack_include": include,

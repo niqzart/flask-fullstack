@@ -9,11 +9,11 @@ from sqlalchemy import MetaData, select
 from sqlalchemy.engine import Row
 from sqlalchemy.orm import DeclarativeMeta, declarative_base
 from sqlalchemy.sql import Select
+from typing_extensions import Self
 
 from .named import NamedPropertiesMeta
 
 v = TypeVar("v")
-t = TypeVar("t", bound="Model")
 m = TypeVar("m", bound="SQLAlchemy.Model")
 
 
@@ -25,7 +25,7 @@ class CustomModel(Model):
     __fsa__: SQLAlchemy
 
     @classmethod
-    def create(cls: type[t], **kwargs) -> t:
+    def create(cls, **kwargs) -> Self:
         entry = cls(**kwargs)
         cls.__fsa__.session.add(entry)
         cls.__fsa__.session.flush()
@@ -38,24 +38,24 @@ class CustomModel(Model):
         return select(cls).filter_by(**kwargs).order_by(*order_by)
 
     @classmethod
-    def find_first_by_kwargs(cls: type[t], *order_by, **kwargs) -> t | None:
+    def find_first_by_kwargs(cls, *order_by, **kwargs) -> Self | None:
         return cls.__fsa__.get_first(cls.select_by_kwargs(*order_by, **kwargs))
 
     @classmethod
-    def find_all_by_kwargs(cls: type[t], *order_by, **kwargs) -> list[t]:
+    def find_all_by_kwargs(cls, *order_by, **kwargs) -> list[Self]:
         return cls.__fsa__.get_all(cls.select_by_kwargs(*order_by, **kwargs))
 
     @classmethod
     def find_paginated_by_kwargs(
-        cls: type[t], offset: int, limit: int, *order_by, **kwargs
-    ) -> list[t]:
+        cls, offset: int, limit: int, *order_by, **kwargs
+    ) -> list[Self]:
         return cls.__fsa__.get_paginated(
             cls.select_by_kwargs(*order_by, **kwargs), offset, limit
         )
 
     @classmethod
-    def delete_by_kwargs(cls: type[t], **kwargs) -> bool:
-        entry: t | None = cls.find_first_by_kwargs(**kwargs)
+    def delete_by_kwargs(cls, **kwargs) -> bool:
+        entry: Self | None = cls.find_first_by_kwargs(**kwargs)
         if entry is not None:
             entry.delete()
         return entry is None

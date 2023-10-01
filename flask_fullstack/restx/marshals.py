@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import warnings
 from abc import ABC
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, time
-from typing import ForwardRef, TypeVar
+from types import UnionType
+from typing import Any, ClassVar, ForwardRef, TypeVar, get_args, get_origin
 
+import pydantic as pydantic_v2
+import pydantic.v1 as pydantic_v1  # noqa: WPS301
 from flask_restx import Model as _Model, Namespace
 from flask_restx.fields import (
     Boolean as BooleanField,
@@ -19,6 +23,8 @@ from flask_restx.fields import (
 from flask_restx.reqparse import RequestParser
 from pydantic.v1 import BaseModel
 from pydantic.v1.fields import ModelField
+from pydantic_core import PydanticUndefined
+from pydantic_marshals.utils import is_subtype
 from sqlalchemy import Column, Date, Float, Sequence, Time
 from sqlalchemy.sql.type_api import TypeEngine
 from sqlalchemy.types import JSON, Boolean, DateTime, Enum, Integer, String
@@ -68,7 +74,10 @@ type_to_field: dict[type, type[RawField]] = {
     int: IntegerField,
     float: FloatField,
     str: StringField,
+    dict: JSONLoadableField,
     JSON: JSONLoadableField,
+    time: TimeField,
+    date: DateField,
     datetime: DateTimeField,
 }
 
@@ -365,13 +374,16 @@ class Model(Nameable):
 
     @staticmethod
     def include_nest_model(
-        model: type[Model],
+        model: type[Model] | type[pydantic_v2.BaseModel],
         field_name: str,
         parameter_name: str = None,
         as_list: bool = False,
         required: bool = True,
         skip_none: bool = True,
     ) -> Callable[[type[t]], type[t]]:
+        if isinstance(model, type) and issubclass(model, pydantic_v2.BaseModel):
+            model = v2_model_to_ffs(model)
+
         if parameter_name is None:
             parameter_name = field_name
 
@@ -424,7 +436,7 @@ class Model(Nameable):
     @classmethod
     def nest_model(
         cls,
-        model: type[Model],
+        model: type[Model] | type[pydantic_v2.BaseModel],
         field_name: str,
         parameter_name: str = None,
         as_list: bool = False,
@@ -446,9 +458,12 @@ class Model(Nameable):
 
     @staticmethod
     def include_flat_nest_model(
-        model: type[Model],
+        model: type[Model] | type[pydantic_v2.BaseModel],
         parameter_name: str,
     ) -> Callable[[type[t]], type[t]]:
+        if isinstance(model, type) and issubclass(model, pydantic_v2.BaseModel):
+            model = v2_model_to_ffs(model)
+
         def include_flat_nest_model_inner(cls: type[t]) -> type[t]:
             class ModModel(cls):
                 @classmethod
@@ -484,7 +499,9 @@ class Model(Nameable):
         return include_flat_nest_model_inner
 
     @classmethod
-    def nest_flat_model(cls, model: type[Model], parameter_name: str) -> type[t]:
+    def nest_flat_model(
+        cls, model: type[Model] | type[pydantic_v2.BaseModel], parameter_name: str
+    ) -> type[t]:
         @cls.include_flat_nest_model(model, parameter_name)
         class ModModel(cls):
             pass
@@ -494,7 +511,12 @@ class Model(Nameable):
     # TODO include_relationship decorator & relationship_model metagenerator-classmethod
 
     @staticmethod
-    def include_model(model: type[Model]) -> Callable[[type[t]], type[t]]:
+    def include_model(
+        model: type[Model] | type[pydantic_v2.BaseModel],
+    ) -> Callable[[type[t]], type[t]]:
+        if isinstance(model, type) and issubclass(model, pydantic_v2.BaseModel):
+            model = v2_model_to_ffs(model)
+
         def include_model_inner(cls: type[t]) -> type[t]:
             class ModModel(cls, model):
                 pass
@@ -504,7 +526,10 @@ class Model(Nameable):
         return include_model_inner
 
     @classmethod
-    def combine_with(cls, model: type[Model]) -> type[t]:
+    def combine_with(cls, model: type[Model] | type[pydantic_v2.BaseModel]) -> type[t]:
+        if isinstance(model, type) and issubclass(model, pydantic_v2.BaseModel):
+            model = v2_model_to_ffs(model)
+
         # only use as a property in a subclass of NamedProperties!
         class ModModel(cls, model):
             pass
@@ -632,3 +657,64 @@ class PydanticModel(BaseModel, Model, ABC):
     @classmethod
     def deconvert_one(cls, data: dict[str, ...]) -> Self:
         return super().parse_obj(data)
+
+
+def de_optional(args: Any) -> Any:
+    optional: bool = False
+    result: Any = None
+    for arg in args:
+        if is_subtype(arg, type(None)):
+            optional = True
+        elif is_subtype(arg, pydantic_v2.BaseModel):
+            result = arg
+    if optional:
+        return result
+    return None
+
+
+def v2_annotation_to_v1(annotation: Any) -> Any:
+    origin = get_origin(annotation)
+    args = get_args(annotation)
+    if origin is UnionType and len(args) == 2:
+        model = de_optional(args)
+        if model is not None:
+            return v2_model_to_ffs(model) | None
+    if origin is list and is_subtype(args[0], pydantic_v2.BaseModel):
+        return list[v2_model_to_ffs(args[0])]
+    if is_subtype(annotation, pydantic_v2.BaseModel):
+        return v2_model_to_ffs(annotation)
+    return annotation
+
+
+def v2_field_to_v1(field: pydantic_v2.fields.FieldInfo) -> pydantic_v1.fields.FieldInfo:
+    kwargs = {"alias": field.alias}
+    if field.default is not PydanticUndefined:
+        kwargs["default"] = field.default
+    return pydantic_v1.Field(**kwargs)
+
+
+class PydanticBase(PydanticModel):
+    raw: ClassVar[type[pydantic_v2.BaseModel]]
+
+    class Config:
+        orm_mode = True
+
+    @classmethod
+    def convert_one(cls, orm_object, **context) -> Self:
+        if context:
+            warnings.warn("Context is deprecated", DeprecationWarning)
+        return cls.from_orm(orm_object)
+
+
+def v2_model_to_ffs(model: type[pydantic_v2.BaseModel]) -> type[PydanticBase]:
+    result = pydantic_v1.create_model(
+        model.__name__,
+        __base__=PydanticBase,
+        **{
+            f_name: (v2_annotation_to_v1(field.annotation), v2_field_to_v1(field))
+            for f_name, field in model.model_fields.items()
+        },
+    )
+    result.name = model.__name__
+    result.raw = model
+    return result
