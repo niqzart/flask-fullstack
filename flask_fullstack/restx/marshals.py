@@ -5,6 +5,7 @@ from abc import ABC
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, time
+from types import UnionType
 from typing import Any, ClassVar, ForwardRef, TypeVar, get_args, get_origin
 
 import pydantic as pydantic_v2
@@ -658,10 +659,28 @@ class PydanticModel(BaseModel, Model, ABC):
         return super().parse_obj(data)
 
 
+def de_optional(args: Any) -> Any:
+    optional: bool = False
+    result: Any = None
+    for arg in args:
+        if is_subtype(arg, type(None)):
+            optional = True
+        elif is_subtype(arg, pydantic_v2.BaseModel):
+            result = arg
+    if optional:
+        return result
+    return None
+
+
 def v2_annotation_to_v1(annotation: Any) -> Any:
     origin = get_origin(annotation)
-    if origin is list and is_subtype(get_args(annotation)[0], pydantic_v2.BaseModel):
-        return list[v2_model_to_ffs(get_args(annotation)[0])]
+    args = get_args(annotation)
+    if origin is UnionType and len(args) == 2:
+        model = de_optional(args)
+        if model is not None:
+            return v2_model_to_ffs(model) | None
+    if origin is list and is_subtype(args[0], pydantic_v2.BaseModel):
+        return list[v2_model_to_ffs(args[0])]
     if is_subtype(annotation, pydantic_v2.BaseModel):
         return v2_model_to_ffs(annotation)
     return annotation
