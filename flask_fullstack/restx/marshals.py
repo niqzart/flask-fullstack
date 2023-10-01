@@ -686,10 +686,15 @@ def v2_annotation_to_v1(annotation: Any) -> Any:
     return annotation
 
 
-def v2_field_to_v1(field: pydantic_v2.fields.FieldInfo) -> pydantic_v1.fields.FieldInfo:
+def v2_field_to_v1(
+    field: pydantic_v2.fields.FieldInfo,
+    optional: bool = False,
+) -> pydantic_v1.fields.FieldInfo:
     kwargs = {"alias": field.alias}
     if field.default is not PydanticUndefined:
         kwargs["default"] = field.default
+    elif optional:
+        kwargs["default"] = None
     return pydantic_v1.Field(**kwargs)
 
 
@@ -706,12 +711,18 @@ class PydanticBase(PydanticModel):
         return cls.from_orm(orm_object)
 
 
-def v2_model_to_ffs(model: type[pydantic_v2.BaseModel]) -> type[PydanticBase]:
+def v2_model_to_ffs(
+    model: type[pydantic_v2.BaseModel],
+    optional: bool = False,
+) -> type[PydanticBase]:
     result = pydantic_v1.create_model(
         model.__name__,
         __base__=PydanticBase,
         **{
-            f_name: (v2_annotation_to_v1(field.annotation), v2_field_to_v1(field))
+            f_name: (
+                v2_annotation_to_v1(field.annotation),
+                v2_field_to_v1(field, optional=optional),
+            )
             for f_name, field in model.model_fields.items()
         },
     )

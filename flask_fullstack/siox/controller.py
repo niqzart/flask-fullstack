@@ -38,7 +38,7 @@ class EventController(EventGroupBase):
         self, client_model: type[BaseModel] | type[BaseModelV2] = BaseModel
     ):
         if is_subtype(client_model, BaseModelV2):
-            client_model = v2_model_to_ffs(client_model)
+            client_model = v2_model_to_ffs(client_model, optional=True)
 
         self._maybe_bind_model(client_model)
 
